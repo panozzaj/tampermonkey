@@ -93,10 +93,12 @@
                 $labelsButton.click();
                 // don't add 'l' to the text field
                 return false;
-
             }
+        } else if (e.key === 'c') {
+            $("button[data-on-click='App.Controller.AddNewStory.render']").click();
+            // don't add 'c' to the new story title
+            return false;
         }
-        // idea: 'c' for create story?
     });
 
 
