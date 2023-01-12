@@ -38,11 +38,11 @@
         $newStoryAttributes.find('.story-iteration').hide();
         $editStoryAttributes.find('.story-iteration').hide();
 
-        // Story: hide followers -- I don't really use
+        // Story: hide followers -- kind of pointless
         $newStoryAttributes.find('.story-followers').hide();
         $editStoryAttributes.find('.story-followers-container').hide();
 
-        // Story: hide requester -- I don't use much
+        // Story: hide requester -- I don't typically care who requested the story
         $newStoryAttributes.find('[data-component-key="AddStoryRequesterField"]').hide();
         $editStoryAttributes.find('[data-component-key="RequesterField"]').hide();
 
@@ -59,6 +59,7 @@
             .insertAfter($editStoryAttributes.find('#updateStoryRequesterOwnerFields'));
 
         // Add a space before some non-critical elements
+        // TODO: this won't work since we're inserting the same element before a non-existent if editing
         $('#custom-spacer').insertBefore($newStoryAttributes.find('.story-points'));
         $('#custom-spacer').insertBefore($editStoryAttributes.find('#story-dialog-estimate-dropdown'));
 
