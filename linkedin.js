@@ -16,7 +16,8 @@
     function hideStuff() {
         const $ = window.$;
         // hide news
-        $('section #feed-news-module').hide();
+        $('section#feed-news-module').hide();
+        $('section.scaffold-layout__aside').hide();
     }
 
     setTimeout(hideStuff, 500);
