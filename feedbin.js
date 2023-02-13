@@ -1,5 +1,5 @@
 // ==UserScript==
-// @name         New Userscript
+// @name         Feedbin
 // @namespace    http://tampermonkey.net/
 // @version      0.1
 // @description  try to take over the world!
@@ -12,7 +12,7 @@
 (function() {
     'use strict';
 
-    console.log('in tampermonkey scriupt: feedbin');
+    console.log('in tampermonkey script: feedbin');
 
     // https://gist.github.com/GlauberF/d8278ce3aa592389e6e3d4e758e6a0c2
     function simulateKey (keyCode, type, modifiers) {
