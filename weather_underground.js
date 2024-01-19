@@ -31,6 +31,11 @@
     }
 
     $("body").keypress(function(e) {
+        // Check if the target is an input, in which case the user is probably typing
+        if ($(e.target).is('input, textarea, [contenteditable="true"]')) {
+            return
+        }
+
         if (e.key === '>' || e.key === '.') {
             $('button[aria-label="Next Day"]').click();
         } else if (e.key === '<' || e.key === ',') {
