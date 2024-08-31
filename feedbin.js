@@ -27,13 +27,42 @@
             event[i] = modifiers[i];
         }
 
+        console.log(`Simulating key: ${keyCode}`);
+
         document.dispatchEvent(event);
     }
 
     const $ = window.jQuery;
 
+    function navigateArticle(direction) {
+        console.log('direction: ', direction);
+
+        const isArticlePaneFocused = $('.entry-column.selected').length > 0;
+        const isArticleListPaneFocused = $('.entries-column.selected').length > 0;
+
+        if (isArticlePaneFocused) {
+            console.log('isArticlePaneFocused');
+            // Go to middle pane
+            simulateKey(72); // 'h'
+            setTimeout(() => {
+                // Move up or down
+                simulateKey(direction === 'next' ? 74 : 75); // 'j' or 'k'
+                setTimeout(() => {
+                    // Go back to article pane
+                    simulateKey(76); // 'l'
+                }, 50);
+            }, 50);
+        } else if (isArticleListPaneFocused) {
+            console.log('isArticleListPaneFocused');
+            // Just move up or down
+            simulateKey(direction === 'next' ? 74 : 75); // 'j' or 'k'
+        } else {
+            console.log('neither is recognized as focused');
+        }
+    }
+
     function scrollContentHalfPage(key) {
-        const halfPagePresses = 25;
+        const halfPagePresses = 20;
         if ($('.entry-column.selected').length > 0) {
             // only want to scroll if the content section is active
             // (otherwise we scroll down many articles)
@@ -46,12 +75,15 @@
     }
 
     $('body').keydown(function(e) {
+        // never mind, these are also usable with shift+j and shift+k
         if (e.key === 'd') { // scroll down half page
             scrollContentHalfPage(40); // down arrow
-            return false;
         } else if (e.key === 'u') { // scroll up half page
             scrollContentHalfPage(38); // up arrow
-            return false;
+        } else if (e.key === 'n') {
+            navigateArticle('next');
+        } else if (e.key === 'p') {
+            navigateArticle('previous');
         }
     });
 })();
