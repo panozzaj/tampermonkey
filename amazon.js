@@ -1,5 +1,5 @@
 // ==UserScript==
-// @name         New Userscript
+// @name         Amazon
 // @namespace    http://tampermonkey.net/
 // @version      0.1
 // @description  try to take over the world!
@@ -61,15 +61,51 @@
         $('#amsDetailRight_feature_div').hide();
         $('#heroQuickPromo_feature_div').hide();
         $('#cr-ADPlaceholder').hide();
+        $('#ad-endcap-1_feature_div').hide();
+        $('[class*="universal-detail-ilm-card_style_desktop"]').hide();
+        $('[id*="ape_Detail_"').hide();
+        $('#sims-themis-sponsored-products-2_feature_div').hide();
+        $('#dp-ads-center-promo-dramabot_feature_div').hide();
+
+        // author stuff
+        $('#followTheAuthor_feature_div').hide();
+        $('[class*="about-the-author-card"]').hide();
+
+        // hide similar / sponsored products
+        // I'd use #, but there are multiple elements with the same id so it will only hide the first
+        $('[id="similarities_feature_div"').hide();
+        $('#organic-complements-top_feature_div').hide();
+        $('#sp_detail2').hide();
+
+        // feedback on shopping experience
+        $('[class*="shopping-cx-feedback-widget"]').hide();
+
+        // editorial reviews
+        $('#editorialReviews_feature_div').hide();
 
         // subnav, doesn't add much for me
         $('#nav-progressive-subnav').hide();
 
         // "Inspiration from this brand"
         $('#postsSameBrandCard_feature_div').hide();
+
+        // move reviews to just below the header info
+        const $reviews = $('#customer-reviews_feature_div')
+        const $dpContainer = $('#dp-container')
+        const $firstDiv = $dpContainer.children('div').first()
+
+        // Check if the #customer-reviews_feature_div is already below the first div
+        if (!$reviews.prev().is($firstDiv)) {
+            $reviews.insertAfter($firstDiv)
+            $('#reviewsMedley .a-fixed-left-grid-inner .a-fixed-left-grid-col.a-col-right').css({ width: '800px' });
+        }
     }
 
     setTimeout(hideStuff, 100);
     setTimeout(hideStuff, 300);
-    setInterval(hideStuff, 500);
+    setTimeout(hideStuff, 500);
+    setTimeout(hideStuff, 1000);
+    setTimeout(hideStuff, 1500);
+    setTimeout(hideStuff, 2000);
+    setInterval(hideStuff, 5000);
 })();
