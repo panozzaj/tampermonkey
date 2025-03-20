@@ -5,8 +5,10 @@
 // @description  try to take over the world!
 // @author       You
 // @match        https://feedbin.com/
+// @require      https://code.jquery.com/jquery-3.6.0.min.js
 // @icon         https://www.google.com/s2/favicons?sz=64&domain=feedbin.com
-// @grant        none
+// @grant        GM_xmlhttpRequest
+// @grant        GM_openInTab
 // ==/UserScript==
 
 (function() {
@@ -124,4 +126,156 @@
             navigateArticle('previous');
         }
     });
+
+    // Utility function to decode HTML entities (fixing &amp; → & issue)
+    function decodeHTML(html) {
+        let textArea = document.createElement('textarea');
+        textArea.innerHTML = html;
+        return textArea.value;
+    }
+
+    // Utility function to strip query parameters AFTER resolving the final URL
+    function cleanURL(url) {
+        try {
+            let parsedUrl = new URL(url);
+            let cleanedUrl = parsedUrl.origin + parsedUrl.pathname; // Strip all query params
+            console.log(`[Feedbin Enhanced Sharing] Cleaned final URL: ${cleanedUrl}`);
+            return cleanedUrl;
+        } catch (e) {
+            console.error('[Feedbin Enhanced Sharing] Invalid URL:', url);
+            return url;
+        }
+    }
+
+    // Function to resolve Substack redirects correctly
+    function resolveSubstackRedirect(substackUrl, postTitle, callback, depth = 0) {
+        if (depth > 5) {
+            console.warn("[Feedbin Enhanced Sharing] Too many redirects, aborting.");
+            callback(cleanURL(substackUrl), postTitle);
+            return;
+        }
+
+        // Decode any HTML-escaped characters (fix &amp; issue)
+        substackUrl = decodeHTML(substackUrl);
+        console.log(`[Feedbin Enhanced Sharing] Resolving Substack redirect (Attempt ${depth + 1}): ${substackUrl}`);
+
+        GM_xmlhttpRequest({
+            method: 'GET',
+            url: substackUrl,
+            onload: function(response) {
+                let html = response.responseText;
+
+                // 1. Check for a Location redirect header
+                let redirectUrl = response.finalUrl;
+                if (redirectUrl && redirectUrl !== substackUrl) {
+                    console.log(`[Feedbin Enhanced Sharing] Redirect detected: ${redirectUrl}`);
+                    resolveSubstackRedirect(redirectUrl, postTitle, callback, depth + 1);
+                    return;
+                }
+
+                // 2. Extract canonical URL if available
+                let canonicalMatch = html.match(/<link rel="canonical" href="([^"]+)"/i);
+                if (canonicalMatch) {
+                    let finalUrl = canonicalMatch[1];
+                    console.log(`[Feedbin Enhanced Sharing] Extracted canonical URL: ${finalUrl}`);
+                    callback(cleanURL(finalUrl), postTitle);
+                    return;
+                }
+
+                // 3. If no canonical URL, return the last visited URL
+                console.warn("[Feedbin Enhanced Sharing] No canonical URL found, using last resolved URL.");
+                callback(cleanURL(substackUrl), postTitle);
+            },
+            onerror: function() {
+                console.error('[Feedbin Enhanced Sharing] Error following Substack redirect:', substackUrl);
+                callback(cleanURL(substackUrl), postTitle);
+            }
+        });
+    }
+
+    // Function to resolve the correct post URL from Feedbin newsletters
+    function resolveFinalURL(feedbinUrl, callback) {
+        console.log(`[Feedbin Enhanced Sharing] Resolving final URL for: ${feedbinUrl}`);
+
+        GM_xmlhttpRequest({
+            method: 'GET',
+            url: feedbinUrl,
+            onload: function(response) {
+                let html = response.responseText;
+
+                // Extract the real post link from <h1 class="post-title"> <a href="...">
+                let linkMatch = html.match(/<h1 class="post-title[^>]*>\s*<a href="([^"]+)"/i);
+                let titleMatch = html.match(/<h1 class="post-title[^>]*>\s*<a [^>]*>([^<]+)<\/a>/i);
+
+                if (linkMatch && titleMatch) {
+                    let finalUrl = decodeHTML(linkMatch[1]); // Fix &amp; → &
+                    let postTitle = titleMatch[1].trim();
+
+                    console.log(`[Feedbin Enhanced Sharing] Extracted from newsletter - Title: "${postTitle}", URL: ${finalUrl}`);
+
+                    // If the link is a Substack redirect, resolve it
+                    if (finalUrl.includes('substack.com/app-link/')) {
+                        resolveSubstackRedirect(finalUrl, postTitle, callback);
+                    } else {
+                        callback(cleanURL(finalUrl), postTitle);
+                    }
+                } else {
+                    console.warn('[Feedbin Enhanced Sharing] Could not extract final URL or title from Feedbin.');
+                    callback(cleanURL(feedbinUrl), "Interesting post");
+                }
+            },
+            onerror: function() {
+                console.error('[Feedbin Enhanced Sharing] Error fetching:', feedbinUrl);
+                callback(cleanURL(feedbinUrl), "Interesting post");
+            }
+        });
+    }
+
+    // Function to modify and open the Buffer share link
+    function processShareLink(target) {
+        let shareUrl = new URL(target.href);
+        let originalUrl = decodeURIComponent(shareUrl.searchParams.get('url'));
+
+        console.log(`[Feedbin Enhanced Sharing] Original Share URL: ${originalUrl}`);
+
+        if (originalUrl.includes('newsletters.feedbinusercontent.com')) {
+            console.log('[Feedbin Enhanced Sharing] Detected Feedbin newsletter redirect, resolving...');
+            resolveFinalURL(originalUrl, function(finalUrl, postTitle) {
+                let newShareUrl = `http://bufferapp.com/add?url=${encodeURIComponent(finalUrl)}&text=${encodeURIComponent("Interesting post: " + postTitle)}`;
+                console.log(`[Feedbin Enhanced Sharing] Opening new share URL: ${newShareUrl}`);
+
+                GM_openInTab(newShareUrl, { active: true, insert: true, setParent: true });
+            });
+        } else {
+            let cleanedUrl = cleanURL(originalUrl);
+            resolveSubstackRedirect(cleanedUrl, "Interesting post", function(finalUrl, postTitle) {
+                let newShareUrl = `http://bufferapp.com/add?url=${encodeURIComponent(finalUrl)}&text=${encodeURIComponent("Interesting post: " + postTitle)}`;
+                console.log(`[Feedbin Enhanced Sharing] Opening new share URL: ${newShareUrl}`);
+
+                GM_openInTab(newShareUrl, { active: true, insert: true, setParent: true });
+            });
+        }
+    }
+
+    // Intercept clicks on the Buffer share button
+    document.body.addEventListener('click', function(event) {
+        let target = event.target.closest('a[data-behavior="share_popup"]');
+        if (target) {
+            event.preventDefault();
+            event.stopPropagation();
+            processShareLink(target);
+        }
+    });
+
+    // Intercept keyboard shortcut "1" for sharing
+    document.addEventListener('keydown', function(event) {
+        if (event.key === '1' && !event.ctrlKey && !event.metaKey) {
+            let target = document.querySelector('a[data-keyboard-shortcut="1"]');
+            if (target) {
+                event.preventDefault();
+                processShareLink(target);
+            }
+        }
+    });
+
 })();
