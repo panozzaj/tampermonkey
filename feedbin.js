@@ -37,11 +37,11 @@
     function navigateArticle(direction) {
         console.log('direction: ', direction);
 
-        const isArticlePaneFocused = $('.entry-column.selected').length > 0;
         const isArticleListPaneFocused = $('.entries-column.selected').length > 0;
 
-        if (isArticlePaneFocused) {
-            console.log('isArticlePaneFocused');
+        if (isArticlePaneFocused()) {
+            console.log('article pane is focused');
+
             // Go to middle pane
             simulateKey(72); // 'h'
             setTimeout(() => {
@@ -52,8 +52,9 @@
                     simulateKey(76); // 'l'
                 }, 50);
             }, 50);
-        } else if (isArticleListPaneFocused) {
-            console.log('isArticleListPaneFocused');
+        } else if (isArticleListPaneFocused()) {
+            console.log('article list pane is focused');
+
             // Just move up or down
             simulateKey(direction === 'next' ? 74 : 75); // 'j' or 'k'
         } else {
@@ -66,6 +67,10 @@
         if ($('.entry-column.selected').length > 0) {
             // only want to scroll if the content section is active
             // (otherwise we scroll down many articles)
+            // TODO: if you move to the articles pane after pressing this
+            // but before it finishes, you'll move down the articles.
+            // Could check within the timeout handler or cancel the timeouts if
+            // the articles section is selected.
             for (var i = 0; i < halfPagePresses; i++) {
                 setTimeout(function() {
                     simulateKey(key);
@@ -74,9 +79,42 @@
         }
     }
 
+    function scrollToTop() {
+        if (isArticlePaneFocused()) {
+            const articlePane = document.querySelector('.entry-column.selected');
+            if (!articlePane) return;
+            const contentContainer = articlePane.querySelector('.entry-content');
+            if (contentContainer) contentContainer.scrollTop = 0;
+            articlePane.scrollTop = 0;
+            window.scrollTop = 0;
+        }
+    }
+
+    function scrollToBottom() {
+        if (isArticlePaneFocused()) {
+            const articlePane = document.querySelector('.entry-column.selected');
+            if (!articlePane) return;
+            const contentContainer = articlePane.querySelector('.entry-content');
+            if (contentContainer) contentContainer.scrollTop = contentContainer.scrollHeight;
+            articlePane.scrollTop = articlePane.scrollHeight;
+            window.scrollTop = document.body.scrollHeight;
+        }
+    }
+
+    function isArticlePaneFocused() {
+        return $('.entry-column.selected').length > 0
+    }
+
+    function isArticleListPaneFocused() {
+        return $('.entries-column.selected').length > 0;
+    }
+
     $('body').keydown(function(e) {
-        // never mind, these are also usable with shift+j and shift+k
-        if (e.key === 'd') { // scroll down half page
+        if (e.key === 'g' && !e.shiftKey) {
+            scrollToTop();
+        } else if (e.key === 'G') { // Capital G
+            scrollToBottom();
+        } else if (e.key === 'd') { // scroll down half page
             scrollContentHalfPage(40); // down arrow
         } else if (e.key === 'u') { // scroll up half page
             scrollContentHalfPage(38); // up arrow
