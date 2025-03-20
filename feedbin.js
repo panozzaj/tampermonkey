@@ -149,7 +149,7 @@
 
     // Function to resolve Substack redirects correctly
     function resolveSubstackRedirect(substackUrl, postTitle, callback, depth = 0) {
-        if (depth > 5) {
+        if (depth > 3) {
             console.warn("[Feedbin Enhanced Sharing] Too many redirects, aborting.");
             callback(cleanURL(substackUrl), postTitle);
             return;
@@ -165,7 +165,7 @@
             onload: function(response) {
                 let html = response.responseText;
 
-                // 1. Check for a Location redirect header
+                // Check for a Location redirect header
                 let redirectUrl = response.finalUrl;
                 if (redirectUrl && redirectUrl !== substackUrl) {
                     console.log(`[Feedbin Enhanced Sharing] Redirect detected: ${redirectUrl}`);
@@ -173,7 +173,7 @@
                     return;
                 }
 
-                // 2. Extract canonical URL if available
+                // Extract canonical URL if available
                 let canonicalMatch = html.match(/<link rel="canonical" href="([^"]+)"/i);
                 if (canonicalMatch) {
                     let finalUrl = canonicalMatch[1];
@@ -182,7 +182,7 @@
                     return;
                 }
 
-                // 3. If no canonical URL, return the last visited URL
+                // If no canonical URL, return the last visited URL
                 console.warn("[Feedbin Enhanced Sharing] No canonical URL found, using last resolved URL.");
                 callback(cleanURL(substackUrl), postTitle);
             },
@@ -193,7 +193,7 @@
         });
     }
 
-    // Function to resolve the correct post URL from Feedbin newsletters
+    // Function to resolve the correct post URL from Feedbin newsletters or normal posts
     function resolveFinalURL(feedbinUrl, callback) {
         console.log(`[Feedbin Enhanced Sharing] Resolving final URL for: ${feedbinUrl}`);
 
@@ -203,7 +203,7 @@
             onload: function(response) {
                 let html = response.responseText;
 
-                // Extract the real post link from <h1 class="post-title"> <a href="...">
+                // Extract possible title and URL from newsletters
                 let linkMatch = html.match(/<h1 class="post-title[^>]*>\s*<a href="([^"]+)"/i);
                 let titleMatch = html.match(/<h1 class="post-title[^>]*>\s*<a [^>]*>([^<]+)<\/a>/i);
 
@@ -219,9 +219,7 @@
                     } else {
                         callback(cleanURL(finalUrl), postTitle);
                     }
-                } else {
-                    console.warn('[Feedbin Enhanced Sharing] Could not extract final URL or title from Feedbin.');
-                    callback(cleanURL(feedbinUrl), "Interesting post");
+                    return;
                 }
             },
             onerror: function() {
@@ -248,12 +246,11 @@
             });
         } else {
             let cleanedUrl = cleanURL(originalUrl);
-            resolveSubstackRedirect(cleanedUrl, "Interesting post", function(finalUrl, postTitle) {
-                let newShareUrl = `http://bufferapp.com/add?url=${encodeURIComponent(finalUrl)}&text=${encodeURIComponent("Interesting post: " + postTitle)}`;
-                console.log(`[Feedbin Enhanced Sharing] Opening new share URL: ${newShareUrl}`);
-
-                GM_openInTab(newShareUrl, { active: true, insert: true, setParent: true });
-            });
+            let postTitle = $('.entry-inner .entry-header h1').text()
+            console.log(`[Feedbin Enhanced Sharing] cleanedUrl: ${cleanedUrl}`);
+            let newShareUrl = `http://bufferapp.com/add?url=${encodeURIComponent(cleanedUrl)}&text=${encodeURIComponent("Interesting post: " + postTitle)}`;
+            console.log(`[Feedbin Enhanced Sharing] Opening new share URL: ${newShareUrl}`);
+            GM_openInTab(newShareUrl, { active: true, insert: true, setParent: true });
         }
     }
 
