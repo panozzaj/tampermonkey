@@ -10,20 +10,20 @@
 // @run-at       document-start
 // ==/UserScript==
 
-(function() {
-    'use strict';
+;(function () {
+  "use strict"
 
-    console.log('here in userscript');
+  console.log("here in userscript")
 
-    // Add styles to hide reels/shorts
-    GM_addStyle(`
+  // Add styles to hide reels/shorts
+  GM_addStyle(`
         ytd-reel-shelf-renderer,
         ytd-rich-shelf-renderer[is-shorts],
         ytd-reel-shelf-renderer[is-shorts] {
             display: none !important;
         }
-    `);
+    `)
 
-    // Log to console to confirm script execution
-    console.log('YouTube Hide Reels script has been applied');
-})();
+  // Log to console to confirm script execution
+  console.log("YouTube Hide Reels script has been applied")
+})()

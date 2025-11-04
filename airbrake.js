@@ -10,23 +10,27 @@
 // @grant        none
 // ==/UserScript==
 
-(function() {
-    'use strict';
+;(function () {
+  "use strict"
 
-    console.log('in airbrake tampermonkey script');
+  console.log("in airbrake tampermonkey script")
 
-    $("body").keypress(function(e) {
-        // go to next occurrence
-        if (e.key === '<' || e.key === ',') {
-            const button = document.querySelector('.occurrence-header button.btn i.glyphicon.glyphicon-angle-left');
-            if (button && button.parentNode) {
-              button.parentNode.click();
-            }
-        } else if (e.key === '>' || e.key === '.') {
-            const button = document.querySelector('.occurrence-header button.btn i.glyphicon.glyphicon-angle-right');
-            if (button && button.parentNode) {
-              button.parentNode.click();
-            }
-        }
-    });
-})();
+  $("body").keypress(function (e) {
+    // go to next occurrence
+    if (e.key === "<" || e.key === ",") {
+      const button = document.querySelector(
+        ".occurrence-header button.btn i.glyphicon.glyphicon-angle-left"
+      )
+      if (button && button.parentNode) {
+        button.parentNode.click()
+      }
+    } else if (e.key === ">" || e.key === ".") {
+      const button = document.querySelector(
+        ".occurrence-header button.btn i.glyphicon.glyphicon-angle-right"
+      )
+      if (button && button.parentNode) {
+        button.parentNode.click()
+      }
+    }
+  })
+})()

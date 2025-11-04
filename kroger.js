@@ -12,15 +12,15 @@
 
 /* globals $ */
 
-(function() {
-    'use strict';
-    console.log('in Kroger userscript')
+;(function () {
+  "use strict"
+  console.log("in Kroger userscript")
 
-    // make original price easier to read (by default it is crossed out)
-    const style = document.createElement('style');
+  // make original price easier to read (by default it is crossed out)
+  const style = document.createElement("style")
 
-    // note: using /* */ style comments in CSS is necessary!
-    style.innerHTML = `
+  // note: using /* */ style comments in CSS is necessary!
+  style.innerHTML = `
       /* don't strike out standard price (hard to read) */
       s.kds-Price-original {
         text-decoration: none !important;
@@ -32,33 +32,33 @@
       }
     `
 
-    const $ = window.$;
+  const $ = window.$
 
-    // https://stackoverflow.com/questions/8746882/jquery-contains-selector-uppercase-and-lower-case-issue
-    $.expr[':'].icontains = function(a, i, m) {
-        return $(a).text().toUpperCase().indexOf(m[3].toUpperCase()) >= 0;
-    };
+  // https://stackoverflow.com/questions/8746882/jquery-contains-selector-uppercase-and-lower-case-issue
+  $.expr[":"].icontains = function (a, i, m) {
+    return $(a).text().toUpperCase().indexOf(m[3].toUpperCase()) >= 0
+  }
 
-    function hideStuff() {
-        // hide ads
-        $('.espot-image').remove();
+  function hideStuff() {
+    // hide ads
+    $(".espot-image").remove()
 
-        // more ads. the class has periods in it, so escape per
-        // https://stackoverflow.com/questions/350292
-        $('.AmpHocEsperanto\\.DynamicRender\\.autorotator').hide();
-        $('.AmpHocEsperanto\\.DynamicRender\\.espot').hide();
-        $('.AmpHocEsperanto\\.DynamicRender\\.toacontainer\\.espot').hide();
-        $('div[data-testid="monetization/search-page-top"]').hide();
+    // more ads. the class has periods in it, so escape per
+    // https://stackoverflow.com/questions/350292
+    $(".AmpHocEsperanto\\.DynamicRender\\.autorotator").hide()
+    $(".AmpHocEsperanto\\.DynamicRender\\.espot").hide()
+    $(".AmpHocEsperanto\\.DynamicRender\\.toacontainer\\.espot").hide()
+    $('div[data-testid="monetization/search-page-top"]').hide()
 
-        // hide Snap EBT
-        $('.text-positive-less-prominent:icontains(Snap)').hide();
-        $('svg.text-positive-less-prominent').hide();
+    // hide Snap EBT
+    $(".text-positive-less-prominent:icontains(Snap)").hide()
+    $("svg.text-positive-less-prominent").hide()
 
-        if (!document.head.contains(style)) {
-            console.log('appending style');
-            document.head.appendChild(style);
-        }
+    if (!document.head.contains(style)) {
+      console.log("appending style")
+      document.head.appendChild(style)
     }
+  }
 
-    setInterval(hideStuff, 500);
-})();
+  setInterval(hideStuff, 500)
+})()

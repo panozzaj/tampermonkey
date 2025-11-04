@@ -10,24 +10,26 @@
 // @grant        none
 // ==/UserScript==
 
-(function() {
-    'use strict';
-    console.log('in LinkedIn script');
+;(function () {
+  "use strict"
+  console.log("in LinkedIn script")
 
-    function hideStuff() {
-        const $ = window.$;
-        // hide news
-        //$('section#feed-news-module').hide();
-        $('section.scaffold-layout__aside').hide();
+  function hideStuff() {
+    const $ = window.$
+    // hide news
+    //$('section#feed-news-module').hide();
+    $("section.scaffold-layout__aside").hide()
 
-        // Seems like they add whitespace in the classes every now and then?
-        $('[class^="scaffold-layout__aside"]').hide();
-        $('aside.right-rail').hide();
+    // Seems like they add whitespace in the classes every now and then?
+    $('[class^="scaffold-layout__aside"]').hide()
+    $("aside.right-rail").hide()
 
-        // hide promoted posts
-        $('div.feed-shared-update-v2').has('.update-components-actor__sub-description:contains("Promoted")').hide()
-    }
+    // hide promoted posts
+    $("div.feed-shared-update-v2")
+      .has('.update-components-actor__sub-description:contains("Promoted")')
+      .hide()
+  }
 
-    setTimeout(hideStuff, 500);
-    setInterval(hideStuff, 1000);
-})();
+  setTimeout(hideStuff, 500)
+  setInterval(hideStuff, 1000)
+})()

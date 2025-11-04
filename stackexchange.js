@@ -29,7 +29,6 @@
 // @match        */questions/*
 // ==/UserScript==
 
-
 // This cleans up the StackOverflow site to be quite clean.
 // It hides a bunch of elements on the page to make it just
 // be the question and answers.
@@ -37,72 +36,71 @@
 // Note: this currently breaks upvoting and commenting and things.
 // If you want to do that, just disable the script and reload.
 
+console.log("here in StackOverflow cleanup script")
 
-console.log('here in StackOverflow cleanup script');
-
-var $ = window.jQuery;
-var SEsuccess = false;
+var $ = window.jQuery
+var SEsuccess = false
 
 function hideStuff() {
-    SEsuccess = true;
+  SEsuccess = true
 
-    //$('body').css({ 'background-color': '#fdf0f2' });
+  //$('body').css({ 'background-color': '#fdf0f2' });
 
-    // top bar stuff hiding
-    $('.user-logged-in').hide();
-    $('.-marketing-link').hide();
+  // top bar stuff hiding
+  $(".user-logged-in").hide()
+  $(".-marketing-link").hide()
 
-    // hide header and footer
-    $('header').hide();
-    $('footer').hide();
+  // hide header and footer
+  $("header").hide()
+  $("footer").hide()
 
-    // Ask a question button
-    $('.aside-cta').hide();
+  // Ask a question button
+  $(".aside-cta").hide()
 
-    $("#hot-network-questions").hide();
-    $('#hireme').hide();
-    $('.everyonelovesstackoverflow').hide();
-    $(".community-bulletin").hide();
-    $('.module.community-bulletin').hide();
-    $('#js-gdpr-consent-banner').hide();
-    $('.js-consent-banner').hide();
-    $('.js-dismissable-hero').hide();
+  $("#hot-network-questions").hide()
+  $("#hireme").hide()
+  $(".everyonelovesstackoverflow").hide()
+  $(".community-bulletin").hide()
+  $(".module.community-bulletin").hide()
+  $("#js-gdpr-consent-banner").hide()
+  $(".js-consent-banner").hide()
+  $(".js-dismissable-hero").hide()
 
-    // hide left sidebar
-    $('.left-sidebar').hide();
+  // hide left sidebar
+  $(".left-sidebar").hide()
 
-    // expand main content
-    $('#mainbar').css('width', '100%');
-    $('#content').css('width', '100%');
-    $('#content').css('border', 'none');
+  // expand main content
+  $("#mainbar").css("width", "100%")
+  $("#content").css("width", "100%")
+  $("#content").css("border", "none")
 
-    $('#newsletter-ad').hide(); // some random ad thing
-    $('.user-gravatar32').hide(); // poster/answerer profile images
-    $('.badgecount, .badge1, .badge2, .badge3').hide();
+  $("#newsletter-ad").hide() // some random ad thing
+  $(".user-gravatar32").hide() // poster/answerer profile images
+  $(".badgecount, .badge1, .badge2, .badge3").hide()
 
-    // RIGHT SIDEBAR
-    // push to bottom of page and expand
-    $('#sidebar').css({ float: 'none', width: '600px'});
+  // RIGHT SIDEBAR
+  // push to bottom of page and expand
+  $("#sidebar").css({ float: "none", width: "600px" })
 
-    // remove StackOverflow promotions
-    $('.mb16').hide()
+  // remove StackOverflow promotions
+  $(".mb16").hide()
 
-    // remove spacer element
-    $('.js-sidebar-zone').hide();
+  // remove spacer element
+  $(".js-sidebar-zone").hide()
 
-    // random survey popup
-    $('.js-toast').hide();
+  // random survey popup
+  $(".js-toast").hide()
 
-    // remove chat element
-    $('.js-chat-ad-rooms').hide();
-    $('#chat-feature').hide();
-    // END RIGHT SIDEBAR
+  // remove chat element
+  $(".js-chat-ad-rooms").hide()
+  $("#chat-feature").hide()
+  // END RIGHT SIDEBAR
 }
 
-hideStuff();
-setTimeout(hideStuff, 100);
-setTimeout(hideStuff, 250);
-setTimeout(hideStuff, 500);
-setTimeout(hideStuff, 1000);
-setTimeout(hideStuff, 1500);
-setTimeout(hideStuff, 2000);
+hideStuff()
+setTimeout(hideStuff, 100)
+setTimeout(hideStuff, 250)
+setTimeout(hideStuff, 500)
+setTimeout(hideStuff, 1000)
+setTimeout(hideStuff, 1500)
+setTimeout(hideStuff, 2000)
