@@ -13,11 +13,11 @@
 /* globals $ */
 
 ;(function () {
-  "use strict"
-  console.log("in Kroger userscript")
+  'use strict'
+  console.log('in Kroger userscript')
 
   // make original price easier to read (by default it is crossed out)
-  const style = document.createElement("style")
+  const style = document.createElement('style')
 
   // note: using /* */ style comments in CSS is necessary!
   style.innerHTML = `
@@ -35,27 +35,27 @@
   const $ = window.$
 
   // https://stackoverflow.com/questions/8746882/jquery-contains-selector-uppercase-and-lower-case-issue
-  $.expr[":"].icontains = function (a, i, m) {
+  $.expr[':'].icontains = function (a, i, m) {
     return $(a).text().toUpperCase().indexOf(m[3].toUpperCase()) >= 0
   }
 
   function hideStuff() {
     // hide ads
-    $(".espot-image").remove()
+    $('.espot-image').remove()
 
     // more ads. the class has periods in it, so escape per
     // https://stackoverflow.com/questions/350292
-    $(".AmpHocEsperanto\\.DynamicRender\\.autorotator").hide()
-    $(".AmpHocEsperanto\\.DynamicRender\\.espot").hide()
-    $(".AmpHocEsperanto\\.DynamicRender\\.toacontainer\\.espot").hide()
+    $('.AmpHocEsperanto\\.DynamicRender\\.autorotator').hide()
+    $('.AmpHocEsperanto\\.DynamicRender\\.espot').hide()
+    $('.AmpHocEsperanto\\.DynamicRender\\.toacontainer\\.espot').hide()
     $('div[data-testid="monetization/search-page-top"]').hide()
 
     // hide Snap EBT
-    $(".text-positive-less-prominent:icontains(Snap)").hide()
-    $("svg.text-positive-less-prominent").hide()
+    $('.text-positive-less-prominent:icontains(Snap)').hide()
+    $('svg.text-positive-less-prominent').hide()
 
     if (!document.head.contains(style)) {
-      console.log("appending style")
+      console.log('appending style')
       document.head.appendChild(style)
     }
   }

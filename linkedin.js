@@ -11,21 +11,21 @@
 // ==/UserScript==
 
 ;(function () {
-  "use strict"
-  console.log("in LinkedIn script")
+  'use strict'
+  console.log('in LinkedIn script')
 
   function hideStuff() {
     const $ = window.$
     // hide news
     //$('section#feed-news-module').hide();
-    $("section.scaffold-layout__aside").hide()
+    $('section.scaffold-layout__aside').hide()
 
     // Seems like they add whitespace in the classes every now and then?
     $('[class^="scaffold-layout__aside"]').hide()
-    $("aside.right-rail").hide()
+    $('aside.right-rail').hide()
 
     // hide promoted posts
-    $("div.feed-shared-update-v2")
+    $('div.feed-shared-update-v2')
       .has('.update-components-actor__sub-description:contains("Promoted")')
       .hide()
   }

@@ -11,9 +11,9 @@
 // ==/UserScript==
 
 ;(function () {
-  "use strict"
+  'use strict'
 
-  console.log("in custom script")
+  console.log('in custom script')
   const $ = window.$
 
   function hidePostsContainingText(regex) {
@@ -34,7 +34,7 @@
   function hideStuff() {
     // hide ad sidebar
     $(
-      ".hidden-xs.hidden-sm.col-md-12.col-lg-4.info-bar-container.with-navbar"
+      '.hidden-xs.hidden-sm.col-md-12.col-lg-4.info-bar-container.with-navbar'
     ).hide()
 
     const $posts = $('span[data-testid="feed-item-visibility-tracker"] span')
@@ -56,9 +56,9 @@
     hidePostsContainingText(/\boutage\b/i)
 
     // hide listings
-    hidePostsTitled("Items for sale near you")
-    hidePostsTitled("New free listings")
-    hidePostsTitled("New listings for you")
+    hidePostsTitled('Items for sale near you')
+    hidePostsTitled('New free listings')
+    hidePostsTitled('New listings for you')
   }
 
   setInterval(hideStuff, 500)

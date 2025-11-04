@@ -11,9 +11,9 @@
 // ==/UserScript==
 
 ;(function () {
-  "use strict"
+  'use strict'
 
-  console.log("here in userscript")
+  console.log('here in userscript')
 
   // Add styles to hide reels/shorts
   GM_addStyle(`
@@ -25,5 +25,5 @@
     `)
 
   // Log to console to confirm script execution
-  console.log("YouTube Hide Reels script has been applied")
+  console.log('YouTube Hide Reels script has been applied')
 })()

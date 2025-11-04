@@ -11,22 +11,22 @@
 // ==/UserScript==
 
 ;(function () {
-  "use strict"
+  'use strict'
 
-  console.log("in airbrake tampermonkey script")
+  console.log('in airbrake tampermonkey script')
 
-  $("body").keypress(function (e) {
+  $('body').keypress(function (e) {
     // go to next occurrence
-    if (e.key === "<" || e.key === ",") {
+    if (e.key === '<' || e.key === ',') {
       const button = document.querySelector(
-        ".occurrence-header button.btn i.glyphicon.glyphicon-angle-left"
+        '.occurrence-header button.btn i.glyphicon.glyphicon-angle-left'
       )
       if (button && button.parentNode) {
         button.parentNode.click()
       }
-    } else if (e.key === ">" || e.key === ".") {
+    } else if (e.key === '>' || e.key === '.') {
       const button = document.querySelector(
-        ".occurrence-header button.btn i.glyphicon.glyphicon-angle-right"
+        '.occurrence-header button.btn i.glyphicon.glyphicon-angle-right'
       )
       if (button && button.parentNode) {
         button.parentNode.click()
