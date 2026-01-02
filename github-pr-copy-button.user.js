@@ -2,7 +2,7 @@
 // @name         GitHub Universal Copy Button
 // @namespace    http://tampermonkey.net/
 // @version      3.0
-// @description  A resilient script that adds a copy button to classic and modern GitHub views (PR, Issue, Project).
+// @description  Enhances the GitHub copy button with a dropdown menu for copying various identifiers.
 // @author       You
 // @match        https://github.com/*/*/pull/*
 // @match        https://github.com/*/*/issues/*
@@ -11,154 +11,307 @@
 // @grant        none
 // ==/UserScript==
 
-// Copies the issue / PR description and issue number to the clipboard
-// Example: "My Issue" (#1234)
-
 ;(function () {
   'use strict'
   console.log('GitHub Copy Button Script: Initializing...')
 
   let pollingTimer = null
 
-  const baseButtonStyle = `
-    background: none; border: 1px solid transparent; cursor: pointer;
-    display: inline-flex; align-items: center;
-    color: var(--fgColor-muted, #656d76); vertical-align: middle;
-    border-radius: 6px; transition: all 0.2s;
-  `
+  const checkIcon = `<svg aria-hidden="true" height="16" viewBox="0 0 16 16" width="16" fill="#1a7f37"><path d="M13.78 4.22a.75.75 0 0 1 0 1.06l-7.25 7.25a.75.75 0 0 1-1.06 0L2.22 9.28a.751.751 0 0 1 .018-1.042.751.751 0 0 1 1.042-.018L6 10.94l6.72-6.72a.75.75 0 0 1 1.06 0Z"></path></svg>`
 
-  const addHoverListeners = (button) => {
-    button.addEventListener('mouseenter', () => {
-      button.style.backgroundColor = 'var(--bgColor-neutral-muted, #f6f8fa)'
-      button.style.borderColor = 'var(--borderColor-neutral-muted, #d0d7de)'
-    })
-    button.addEventListener('mouseleave', () => {
-      button.style.backgroundColor = 'transparent'
-      button.style.borderColor = 'transparent'
-    })
+  // Get issue/PR info from the page
+  const getIssueInfo = () => {
+    let title, number
+
+    // Try modern view first
+    const modernTitle = document.querySelector('[data-testid="issue-title"]')
+    const modernNumber = document.querySelector(
+      '[data-testid="issue-title"] + span'
+    )
+    if (modernTitle && modernNumber) {
+      title = modernTitle.textContent.trim()
+      number = modernNumber.textContent.trim()
+      return { title, number, numericPart: number.replace(/\D/g, '') }
+    }
+
+    // Try sticky header
+    const stickyTitle = document.querySelector(
+      '[data-testid="issue-title-sticky"]'
+    )
+    const stickyNumber = document.querySelector(
+      '[class*="StickyHeaderTitle-module__issueNumberText"]'
+    )
+    if (stickyTitle && stickyNumber) {
+      title = stickyTitle.textContent.trim()
+      number = stickyNumber.textContent.trim()
+      return { title, number, numericPart: number.replace(/\D/g, '') }
+    }
+
+    // Try classic view
+    const classicTitle = document.querySelector('.js-issue-title')
+    const classicNumber = document.querySelector(
+      '.gh-header-title .f1-light.color-fg-muted'
+    )
+    if (classicTitle && classicNumber) {
+      title = classicTitle.textContent.trim()
+      number = classicNumber.textContent.trim()
+      return { title, number, numericPart: number.replace(/\D/g, '') }
+    }
+
+    return null
   }
 
-  const copyIcon = `<svg class="copy-icon" aria-hidden="true" height="16" viewBox="0 0 16 16" version="1.1" width="16" fill="currentColor"><path d="M0 6.75C0 5.784.784 5 1.75 5h1.5a.75.75 0 0 1 0 1.5h-1.5a.25.25 0 0 0-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 0 0 .25-.25v-1.5a.75.75 0 0 1 1.5 0v1.5A1.75 1.75 0 0 1 9.25 16h-7.5A1.75 1.75 0 0 1 0 14.25Z"></path><path d="M5 1.75C5 .784 5.784 0 6.75 0h7.5C15.216 0 16 .784 16 1.75v7.5A1.75 1.75 0 0 1 14.25 11h-7.5A1.75 1.75 0 0 1 5 9.25Zm1.75-.25a.25.25 0 0 0-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 0 0 .25-.25v-7.5a.25.25 0 0 0-.25-.25Z"></path></svg>`
-  const checkIcon = `<svg class="check-icon" aria-hidden="true" height="16" viewBox="0 0 16 16" version="1.1" width="16" fill="#1a7f37"><path d="M13.78 4.22a.75.75 0 0 1 0 1.06l-7.25 7.25a.75.75 0 0 1-1.06 0L2.22 9.28a.751.751 0 0 1 .018-1.042.751.751 0 0 1 1.042-.018L6 10.94l6.72-6.72a.75.75 0 0 1 1.06 0Z"></path></svg>`
-
-  // Truncates text with ellipsis in the middle if too long
+  // Truncate text with ellipsis in the middle
   const truncateMiddle = (text, maxLen) => {
     if (text.length <= maxLen) return text
     const half = Math.floor((maxLen - 3) / 2)
     return text.slice(0, half) + '...' + text.slice(-half)
   }
 
-  // Creates a button with copy icon and label text
-  const createCopyButton = (copyText, displayText, ariaLabel) => {
-    const button = document.createElement('button')
-    button.className = 'custom-copy-button'
-    button.setAttribute('aria-label', ariaLabel)
-    button.style.cssText =
-      baseButtonStyle +
-      'padding: 2px 6px; margin-left: 4px; font-size: 12px; gap: 4px;'
-    button.innerHTML = `
-      <span class="copy-icon-wrapper">${copyIcon}</span>
-      <span class="check-icon-wrapper" style="display: none;">${checkIcon}</span>
-      <span class="button-label">${displayText}</span>
+  // Create dropdown menu
+  const createDropdownMenu = (copyButton) => {
+    const dropdown = document.createElement('div')
+    dropdown.className = 'custom-copy-dropdown'
+    dropdown.style.cssText = `
+      position: absolute;
+      top: 100%;
+      right: 0;
+      margin-top: 4px;
+      background: var(--bgColor-default, #ffffff);
+      border: 1px solid var(--borderColor-default, #d0d7de);
+      border-radius: 6px;
+      box-shadow: 0 8px 24px rgba(140, 149, 159, 0.2);
+      z-index: 100;
+      min-width: 350px;
+      padding: 4px 0;
+      display: none;
     `
-    addHoverListeners(button)
-    button.addEventListener('click', async (e) => {
-      e.preventDefault()
-      e.stopPropagation()
-      await navigator.clipboard.writeText(copyText)
-      button.querySelector('.copy-icon-wrapper').style.display = 'none'
-      button.querySelector('.check-icon-wrapper').style.display = 'inline-flex'
-      setTimeout(() => {
-        button.querySelector('.copy-icon-wrapper').style.display = 'inline-flex'
-        button.querySelector('.check-icon-wrapper').style.display = 'none'
-      }, 2000)
+
+    const info = getIssueInfo()
+    const currentUrl = window.location.href
+
+    const options = [{ value: currentUrl }]
+
+    if (info) {
+      options.push(
+        { value: info.numericPart },
+        { value: info.number },
+        { value: info.title },
+        { value: `"${info.title}" (${info.number})` }
+      )
+    }
+
+    options.forEach((opt) => {
+      const item = document.createElement('button')
+      item.className = 'custom-copy-dropdown-item'
+      item.style.cssText = `
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        width: 100%;
+        padding: 8px 12px;
+        border: none;
+        background: none;
+        text-align: left;
+        cursor: pointer;
+        font-size: 14px;
+        color: var(--fgColor-default, #1f2328);
+        white-space: nowrap;
+      `
+      const displayText = truncateMiddle(opt.value, 50)
+      const needsTooltip = opt.value.length > 50
+      item.innerHTML = `<span class="item-label">${displayText}</span><span class="item-check" style="margin-left: auto; display: none;">${checkIcon}</span>`
+      if (needsTooltip) {
+        item.title = opt.value
+      }
+
+      item.addEventListener('mouseenter', () => {
+        item.style.backgroundColor = 'var(--bgColor-neutral-muted, #f6f8fa)'
+      })
+      item.addEventListener('mouseleave', () => {
+        item.style.backgroundColor = 'transparent'
+      })
+
+      item.addEventListener('click', async (e) => {
+        e.preventDefault()
+        e.stopPropagation()
+        await navigator.clipboard.writeText(opt.value)
+
+        // Show checkmark
+        const label = item.querySelector('.item-label')
+        const check = item.querySelector('.item-check')
+        label.style.display = 'none'
+        check.style.display = 'block'
+
+        setTimeout(() => {
+          label.style.display = 'block'
+          check.style.display = 'none'
+          dropdown.style.display = 'none'
+        }, 1000)
+      })
+
+      dropdown.appendChild(item)
     })
-    return button
+
+    return dropdown
   }
 
-  // Try to add buttons for a specific view configuration
-  // Returns true if buttons were added, false otherwise
-  const tryAddButtons = (titleSelector, numberSelector, buttonClass) => {
-    const titleElement = document.querySelector(titleSelector)
-    const numberElement = document.querySelector(numberSelector)
+  // Enhance a copy button with dropdown
+  const enhanceCopyButton = (copyButton, tooltip) => {
+    if (copyButton.dataset.enhanced) return false
+    copyButton.dataset.enhanced = 'true'
 
-    if (!titleElement || !numberElement) return false
+    // Update the tooltip text to just "Copy"
+    if (tooltip) {
+      tooltip.setAttribute('aria-label', 'Copy')
+      tooltip.textContent = 'Copy'
+    }
 
-    // Check if buttons already exist for this specific view
-    const parent = numberElement.parentNode
-    if (parent.querySelector(`.${buttonClass}`)) return true // Already exists
+    // Create wrapper for positioning
+    const wrapper = document.createElement('div')
+    wrapper.style.cssText = 'position: relative; display: inline-block;'
 
-    const title = titleElement.textContent.trim()
-    const number = numberElement.textContent.trim()
-    const numericPart = number.replace(/\D/g, '')
-    const fullCopyText = `"${title}" (${number})`
+    // Insert wrapper
+    copyButton.parentNode.insertBefore(wrapper, copyButton)
+    wrapper.appendChild(copyButton)
 
-    // Create and insert the number button right after the number element
-    const numberButton = createCopyButton(
-      numericPart,
-      numericPart,
-      'Copy issue number'
-    )
-    numberButton.classList.add(buttonClass + '-number')
-    parent.insertBefore(numberButton, numberElement.nextSibling)
+    // Create and add dropdown
+    const dropdown = createDropdownMenu(copyButton)
+    wrapper.appendChild(dropdown)
 
-    // Create and insert the full copy button after the number button
-    const fullDisplayText = truncateMiddle(fullCopyText, 40)
-    const fullButton = createCopyButton(
-      fullCopyText,
-      fullDisplayText,
-      'Copy title and number'
-    )
-    fullButton.classList.add(buttonClass)
-    parent.insertBefore(fullButton, numberButton.nextSibling)
+    // Toggle dropdown on click
+    copyButton.addEventListener('click', (e) => {
+      e.preventDefault()
+      e.stopPropagation()
 
-    console.log(`GitHub Copy Button Script: Added buttons for ${buttonClass}`)
+      // Refresh issue info when opening - rebuild dropdown content
+      while (dropdown.firstChild) {
+        dropdown.removeChild(dropdown.firstChild)
+      }
+      const info = getIssueInfo()
+      const currentUrl = window.location.href
+      const options = [{ value: currentUrl }]
+      if (info) {
+        options.push(
+          { value: info.numericPart },
+          { value: info.number },
+          { value: info.title },
+          { value: `"${info.title}" (${info.number})` }
+        )
+      }
+      options.forEach((opt) => {
+        const item = document.createElement('button')
+        item.className = 'custom-copy-dropdown-item'
+        item.style.cssText = `
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          width: 100%;
+          padding: 8px 12px;
+          border: none;
+          background: none;
+          text-align: left;
+          cursor: pointer;
+          font-size: 14px;
+          color: var(--fgColor-default, #1f2328);
+          white-space: nowrap;
+        `
+        const displayText = truncateMiddle(opt.value, 50)
+        const needsTooltip = opt.value.length > 50
+        item.innerHTML = `<span class="item-label">${displayText}</span><span class="item-check" style="margin-left: auto; display: none;">${checkIcon}</span>`
+        if (needsTooltip) {
+          item.title = opt.value
+        }
+        item.addEventListener('mouseenter', () => {
+          item.style.backgroundColor = 'var(--bgColor-neutral-muted, #f6f8fa)'
+        })
+        item.addEventListener('mouseleave', () => {
+          item.style.backgroundColor = 'transparent'
+        })
+        item.addEventListener('click', async (e) => {
+          e.preventDefault()
+          e.stopPropagation()
+          await navigator.clipboard.writeText(opt.value)
+          const label = item.querySelector('.item-label')
+          const check = item.querySelector('.item-check')
+          label.style.display = 'none'
+          check.style.display = 'block'
+          setTimeout(() => {
+            label.style.display = 'block'
+            check.style.display = 'none'
+            dropdown.style.display = 'none'
+          }, 1000)
+        })
+        dropdown.appendChild(item)
+      })
+
+      const isVisible = dropdown.style.display === 'block'
+      dropdown.style.display = isVisible ? 'none' : 'block'
+    })
+
+    // Close dropdown when clicking outside
+    document.addEventListener('click', (e) => {
+      if (!wrapper.contains(e.target)) {
+        dropdown.style.display = 'none'
+      }
+    })
+
+    console.log('GitHub Copy Button Script: Enhanced copy button with dropdown')
     return true
   }
 
-  const addCopyButtons = () => {
-    let anyButtonAdded = false
+  const enhanceCopyButtons = () => {
+    let anyEnhanced = false
 
-    // --- Attempt 1: "Classic" GitHub View ---
-    anyButtonAdded =
-      tryAddButtons(
-        '.js-issue-title',
-        '.gh-header-title .f1-light.color-fg-muted',
-        'custom-copy-button-classic'
-      ) || anyButtonAdded
+    // Find all copy buttons with the "Copy link" tooltip
+    // These are IconButtons with a sibling tooltip that says "Copy link"
+    const tooltips = document.querySelectorAll(
+      '[aria-label="Copy link"], span[id]:not([data-enhanced-tooltip])'
+    )
 
-    // --- Attempt 2: "Modern" GitHub View ---
-    const modernNumberSelector =
-      document.querySelector('[data-testid="issue-title"] + span') ||
-      document.querySelector('a[data-hovercard-url*="/issues/"]')
-    if (modernNumberSelector) {
-      anyButtonAdded =
-        tryAddButtons(
-          '[data-testid="issue-title"]',
-          modernNumberSelector.matches('[data-testid="issue-title"] + span')
-            ? '[data-testid="issue-title"] + span'
-            : 'a[data-hovercard-url*="/issues/"]',
-          'custom-copy-button-modern'
-        ) || anyButtonAdded
-    }
+    tooltips.forEach((tooltip) => {
+      // Check if this is a "Copy link" tooltip
+      if (
+        tooltip.getAttribute('aria-label') === 'Copy link' ||
+        tooltip.textContent === 'Copy link'
+      ) {
+        // Find the associated button
+        const labelledById = tooltip.id
+        let copyButton = null
 
-    // --- Attempt 3: "Sticky Header" View (scrolled projects page) ---
-    anyButtonAdded =
-      tryAddButtons(
-        '[data-testid="issue-title-sticky"]',
-        '[class*="StickyHeaderTitle-module__issueNumberText"]',
-        'custom-copy-button-sticky'
-      ) || anyButtonAdded
+        if (labelledById) {
+          copyButton = document.querySelector(
+            `button[aria-labelledby="${labelledById}"]`
+          )
+        }
 
-    // Stop polling once we've added at least one button
-    if (anyButtonAdded && pollingTimer) {
+        // Also try finding button right before this tooltip
+        if (!copyButton && tooltip.previousElementSibling) {
+          const prev = tooltip.previousElementSibling
+          if (
+            prev.tagName === 'BUTTON' &&
+            prev.querySelector('.octicon-copy')
+          ) {
+            copyButton = prev
+          }
+        }
+
+        if (copyButton && !copyButton.dataset.enhanced) {
+          anyEnhanced = enhanceCopyButton(copyButton, tooltip) || anyEnhanced
+          tooltip.dataset.enhancedTooltip = 'true'
+        }
+      }
+    })
+
+    // Stop polling once we've enhanced at least one button
+    if (anyEnhanced && pollingTimer) {
       clearInterval(pollingTimer)
       pollingTimer = null
     }
   }
 
-  const observer = new MutationObserver(addCopyButtons)
+  const observer = new MutationObserver(enhanceCopyButtons)
   observer.observe(document.body, { childList: true, subtree: true })
 
-  pollingTimer = setInterval(addCopyButtons, 250)
+  pollingTimer = setInterval(enhanceCopyButtons, 250)
 })()
