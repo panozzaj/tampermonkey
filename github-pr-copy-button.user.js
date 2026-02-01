@@ -137,14 +137,11 @@
         e.stopPropagation()
         await navigator.clipboard.writeText(opt.value)
 
-        // Show checkmark
-        const label = item.querySelector('.item-label')
+        // Show checkmark alongside the label
         const check = item.querySelector('.item-check')
-        label.style.display = 'none'
         check.style.display = 'block'
 
         setTimeout(() => {
-          label.style.display = 'block'
           check.style.display = 'none'
           dropdown.style.display = 'none'
         }, 1000)
@@ -232,12 +229,9 @@
           e.preventDefault()
           e.stopPropagation()
           await navigator.clipboard.writeText(opt.value)
-          const label = item.querySelector('.item-label')
           const check = item.querySelector('.item-check')
-          label.style.display = 'none'
           check.style.display = 'block'
           setTimeout(() => {
-            label.style.display = 'block'
             check.style.display = 'none'
             dropdown.style.display = 'none'
           }, 1000)
