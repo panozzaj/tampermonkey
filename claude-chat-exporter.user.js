@@ -4,8 +4,9 @@
 // @version      1.0
 // @description  Export Claude conversations to markdown. Click the Export button next to Share.
 // @author       Anthony Panozzo, Claude (Opus 4.5)
-// @homepageURL  https://github.com/agarwalvishal/claude-chat-exporter
+// @match        https://claude.ai/new
 // @match        https://claude.ai/chat/*
+// @match        https://claude.ai/share/*
 // @grant        none
 // ==/UserScript==
 
@@ -148,52 +149,47 @@
   function extractConversation() {
     const messages = []
 
-    // Find all user messages
-    const userMessages = document.querySelectorAll(
-      '[data-testid="user-message"]'
-    )
+    // Find message turn containers using data-test-render-count
+    // Each turn (human or Claude) is wrapped in a div with this attribute
+    const turnContainers = document.querySelectorAll('[data-test-render-count]')
 
-    // Find all Claude responses - they're in div.standard-markdown that are
-    // direct children of the response container (not inside the collapsed thinking section)
-    // The response area has class "font-claude-response" and the actual response
-    // is the div.standard-markdown that's NOT inside the collapsed overflow:hidden section
-    const claudeResponseContainers = document.querySelectorAll(
-      '.font-claude-response'
-    )
-
-    const claudeMessages = []
-    claudeResponseContainers.forEach((container) => {
-      // Find the visible standard-markdown div (not inside collapsed thinking)
-      // The thinking is inside a div with height: 0px
-      // The actual response is a sibling standard-markdown div
-      const standardMarkdowns = container.querySelectorAll(
-        ':scope > div > .standard-markdown'
-      )
-
-      // Get the last one which is the actual response (not thinking)
-      if (standardMarkdowns.length > 0) {
-        claudeMessages.push(standardMarkdowns[standardMarkdowns.length - 1])
-      }
-    })
-
-    // Interleave messages
-    const maxLen = Math.max(userMessages.length, claudeMessages.length)
-    for (let i = 0; i < maxLen; i++) {
-      if (userMessages[i]) {
-        // For user messages, get the text content
-        const userText = userMessages[i].innerText?.trim() || ''
+    turnContainers.forEach((turn) => {
+      // Check if this is a human message
+      const userMessage = turn.querySelector('[data-testid="user-message"]')
+      if (userMessage) {
+        const userText = userMessage.innerText?.trim() || ''
         if (userText) {
           messages.push({ type: 'human', content: userText })
         }
+        return
       }
-      if (claudeMessages[i]) {
-        // For Claude messages, convert HTML to markdown
-        const claudeMarkdown = htmlToMarkdown(claudeMessages[i])
-        if (claudeMarkdown) {
-          messages.push({ type: 'claude', content: claudeMarkdown })
+
+      // Check if this is a Claude response
+      const claudeResponse = turn.querySelector('.font-claude-response')
+      if (claudeResponse) {
+        // Find ALL standard-markdown sections within this turn
+        // They can be deeply nested, so don't restrict with :scope > div >
+        const standardMarkdowns = turn.querySelectorAll('.standard-markdown')
+
+        // Combine all sections into one response
+        // Use a Set to dedupe (sometimes there are duplicate elements)
+        const seenContent = new Set()
+        const combinedParts = []
+
+        standardMarkdowns.forEach((md) => {
+          const markdown = htmlToMarkdown(md)
+          // Skip empty or duplicate content
+          if (markdown && !seenContent.has(markdown)) {
+            seenContent.add(markdown)
+            combinedParts.push(markdown)
+          }
+        })
+
+        if (combinedParts.length > 0) {
+          messages.push({ type: 'claude', content: combinedParts.join('\n\n') })
         }
       }
-    }
+    })
 
     return messages
   }
@@ -251,11 +247,9 @@
     }
   }
 
-  function addExportButton() {
-    if (document.querySelector('.claude-export-button')) {
-      return
-    }
+  let lastUrl = location.href
 
+  function addExportButton() {
     // Find the Share button container
     const shareButton = document.querySelector(
       'button[data-testid="wiggle-controls-actions-share"]'
@@ -266,6 +260,11 @@
     }
 
     const container = shareButton.parentElement
+
+    // Check if button already exists in THIS container
+    if (container.querySelector('.claude-export-button')) {
+      return
+    }
 
     // Create export button matching Share button style
     const button = document.createElement('button')
@@ -280,6 +279,20 @@
 
     // Insert before Share button
     container.insertBefore(button, shareButton)
+  }
+
+  function handleUrlChange() {
+    if (location.href !== lastUrl) {
+      lastUrl = location.href
+      // Remove any stale export buttons
+      document
+        .querySelectorAll('.claude-export-button')
+        .forEach((btn) => btn.remove())
+      // Re-add after a short delay to let the new page render
+      setTimeout(addExportButton, 100)
+      setTimeout(addExportButton, 500)
+      setTimeout(addExportButton, 1000)
+    }
   }
 
   // Keyboard shortcut
@@ -304,9 +317,13 @@
 
   // Initialize with mutation observer
   const observer = new MutationObserver(() => {
+    handleUrlChange()
     addExportButton()
   })
   observer.observe(document.body, { childList: true, subtree: true })
+
+  // Also listen for popstate (back/forward navigation)
+  window.addEventListener('popstate', handleUrlChange)
 
   // Try immediately and on delays
   addExportButton()
