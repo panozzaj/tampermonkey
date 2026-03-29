@@ -234,7 +234,7 @@
     dropdown.style.cssText = `
       position: absolute;
       top: 100%;
-      right: 0;
+      left: 0;
       margin-top: 4px;
       background: var(--bgColor-default, #ffffff);
       border: 1px solid var(--borderColor-default, #d0d7de);
@@ -252,6 +252,16 @@
       buildDropdownItems(dropdown)
       const isVisible = dropdown.style.display === 'block'
       dropdown.style.display = isVisible ? 'none' : 'block'
+      if (!isVisible) {
+        // Pick the side with more room
+        dropdown.style.left = '0'
+        dropdown.style.right = 'auto'
+        const rect = dropdown.getBoundingClientRect()
+        if (rect.right > window.innerWidth) {
+          dropdown.style.left = 'auto'
+          dropdown.style.right = '0'
+        }
+      }
     })
 
     document.addEventListener('click', (e) => {
