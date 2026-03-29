@@ -390,6 +390,14 @@
           }
           return
         }
+
+        // No matching pattern found - fall back to original URL
+        console.warn(
+          '[Feedbin Enhanced Sharing] Could not extract post URL from newsletter HTML, using original URL.'
+        )
+        let fallbackTitle =
+          $('.entry-inner .entry-header h1').text() || 'Interesting post'
+        callback(cleanURL(feedbinUrl), fallbackTitle)
       },
       onerror: function () {
         console.error('[Feedbin Enhanced Sharing] Error fetching:', feedbinUrl)
