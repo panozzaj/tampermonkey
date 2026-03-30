@@ -11,4 +11,3 @@
 // @grant        GM_openInTab
 // @require      file:///Users/anthony/Documents/dev/tampermonkey/feedbin.js
 // ==/UserScript==
-

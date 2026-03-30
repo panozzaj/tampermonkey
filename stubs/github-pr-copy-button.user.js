@@ -11,4 +11,3 @@
 // @grant        none
 // @require      file:///Users/anthony/Documents/dev/tampermonkey/github-pr-copy-button.user.js
 // ==/UserScript==
-

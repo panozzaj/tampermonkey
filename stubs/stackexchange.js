@@ -29,4 +29,3 @@
 // @match        */questions/*
 // @require      file:///Users/anthony/Documents/dev/tampermonkey/stackexchange.js
 // ==/UserScript==
-

@@ -7,4 +7,3 @@
 // @grant        none
 // @require      file:///Users/anthony/Documents/dev/tampermonkey/shortcut.js
 // ==/UserScript==
-

@@ -10,4 +10,3 @@
 // @grant        none
 // @require      file:///Users/anthony/Documents/dev/tampermonkey/weather_underground.js
 // ==/UserScript==
-

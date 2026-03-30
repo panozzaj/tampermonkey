@@ -10,4 +10,3 @@
 // @run-at       document-start
 // @require      file:///Users/anthony/Documents/dev/tampermonkey/youtube.js
 // ==/UserScript==
-
