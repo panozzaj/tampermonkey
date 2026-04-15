@@ -10,6 +10,16 @@
           }
         ]
       }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/Users/anthony/Documents/dev/claude-hooks/scripts/Stop/stop_auto_commit"
+          }
+        ]
+      }
     ]
   }
 }
