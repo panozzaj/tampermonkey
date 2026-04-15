@@ -23,6 +23,18 @@
 
   const checkIcon = `<svg aria-hidden="true" height="16" viewBox="0 0 16 16" width="16" fill="#1a7f37"><path d="M13.78 4.22a.75.75 0 0 1 0 1.06l-7.25 7.25a.75.75 0 0 1-1.06 0L2.22 9.28a.751.751 0 0 1 .018-1.042.751.751 0 0 1 1.042-.018L6 10.94l6.72-6.72a.75.75 0 0 1 1.06 0Z"></path></svg>`
 
+  // Find the span inside a container whose trimmed text is exactly "#NNN".
+  // Closed PRs wrap the number span alongside an "Edit title" button, so we
+  // can't rely on it being the direct nextElementSibling of the title.
+  const findNumberSpan = (container) => {
+    if (!container) return null
+    const spans = container.querySelectorAll('span')
+    for (const span of spans) {
+      if (/^#\d+$/.test(span.textContent.trim())) return span
+    }
+    return null
+  }
+
   const getIssueInfo = () => {
     let title, number
 
@@ -30,13 +42,8 @@
     const pageTitle = document.querySelector('h1[data-component="PH_Title"]')
     if (pageTitle) {
       const titleSpan = pageTitle.querySelector('.markdown-title')
-      // Number span is sibling of title; .fgColor-muted class was removed
-      const numberSpan = titleSpan?.nextElementSibling
-      if (
-        titleSpan &&
-        numberSpan &&
-        numberSpan.textContent.trim().startsWith('#')
-      ) {
+      const numberSpan = findNumberSpan(pageTitle)
+      if (titleSpan && numberSpan) {
         title = titleSpan.textContent.trim()
         number = numberSpan.textContent.trim()
         return { title, number, numericPart: number.replace(/\D/g, '') }
@@ -168,11 +175,7 @@
     // New GitHub UI
     const pageTitle = document.querySelector('h1[data-component="PH_Title"]')
     if (pageTitle) {
-      const titleEl = pageTitle.querySelector('.markdown-title')
-      numberEl = titleEl?.nextElementSibling
-      if (numberEl && !numberEl.textContent.trim().startsWith('#')) {
-        numberEl = null
-      }
+      numberEl = findNumberSpan(pageTitle)
       anchorEl = numberEl
     }
 
