@@ -23,14 +23,15 @@
 
   const checkIcon = `<svg aria-hidden="true" height="16" viewBox="0 0 16 16" width="16" fill="#1a7f37"><path d="M13.78 4.22a.75.75 0 0 1 0 1.06l-7.25 7.25a.75.75 0 0 1-1.06 0L2.22 9.28a.751.751 0 0 1 .018-1.042.751.751 0 0 1 1.042-.018L6 10.94l6.72-6.72a.75.75 0 0 1 1.06 0Z"></path></svg>`
 
-  // Find the span inside a container whose trimmed text is exactly "#NNN".
-  // Closed PRs wrap the number span alongside an "Edit title" button, so we
-  // can't rely on it being the direct nextElementSibling of the title.
-  const findNumberSpan = (container) => {
+  // Find the element inside a container whose trimmed text is exactly "#NNN".
+  // Closed PRs wrap the number span alongside an "Edit title" button, and
+  // project-view side panels render the number as an <a> inside a container
+  // div, so we can't rely on position or tag.
+  const findNumberElement = (container) => {
     if (!container) return null
-    const spans = container.querySelectorAll('span')
-    for (const span of spans) {
-      if (/^#\d+$/.test(span.textContent.trim())) return span
+    const elements = container.querySelectorAll('span, a')
+    for (const el of elements) {
+      if (/^#\d+$/.test(el.textContent.trim())) return el
     }
     return null
   }
@@ -42,10 +43,10 @@
     const pageTitle = document.querySelector('h1[data-component="PH_Title"]')
     if (pageTitle) {
       const titleSpan = pageTitle.querySelector('.markdown-title')
-      const numberSpan = findNumberSpan(pageTitle)
-      if (titleSpan && numberSpan) {
+      const numberEl = findNumberElement(pageTitle)
+      if (titleSpan && numberEl) {
         title = titleSpan.textContent.trim()
-        number = numberSpan.textContent.trim()
+        number = numberEl.textContent.trim()
         return { title, number, numericPart: number.replace(/\D/g, '') }
       }
     }
@@ -175,8 +176,14 @@
     // New GitHub UI
     const pageTitle = document.querySelector('h1[data-component="PH_Title"]')
     if (pageTitle) {
-      numberEl = findNumberSpan(pageTitle)
-      anchorEl = numberEl
+      numberEl = findNumberElement(pageTitle)
+      // On project-view side panels the number <a> lives inside a container
+      // div; inject the button after that container so it doesn't sit between
+      // the number link and its wrapper's layout.
+      anchorEl =
+        numberEl?.closest(
+          '[class*="HeaderViewer-module__issueNumberContainer"]'
+        ) || numberEl
     }
 
     // data-testid approach
