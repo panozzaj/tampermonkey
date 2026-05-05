@@ -167,7 +167,13 @@
       }
     }
 
-    if (injected) return
+    if (injected) {
+      if (document.querySelector('.custom-copy-btn-wrapper')) return
+      injected = false
+      if (!pollingTimer) {
+        pollingTimer = setInterval(injectCopyButton, 250)
+      }
+    }
 
     // Find the number span next to the title
     let numberEl = null
