@@ -61,10 +61,6 @@
 
     const checkIcon = `<svg aria-hidden="true" height="16" viewBox="0 0 16 16" width="16" fill="#1a7f37"><path d="M13.78 4.22a.75.75 0 0 1 0 1.06l-7.25 7.25a.75.75 0 0 1-1.06 0L2.22 9.28a.751.751 0 0 1 .018-1.042.751.751 0 0 1 1.042-.018L6 10.94l6.72-6.72a.75.75 0 0 1 1.06 0Z"></path></svg>`
 
-    // Find the element inside a container whose trimmed text is exactly "#NNN".
-    // Closed PRs wrap the number span alongside an "Edit title" button, and
-    // project-view side panels render the number as an <a> inside a container
-    // div, so we can't rely on position or tag.
     const findNumberElement = (container) => {
       if (!container) return null
       const elements = container.querySelectorAll('span, a')
@@ -173,69 +169,214 @@
       return text.slice(0, half) + '...' + text.slice(-half)
     }
 
-    const buildDropdownItems = (dropdown) => {
-      while (dropdown.firstChild) dropdown.removeChild(dropdown.firstChild)
+    // --- Modal copy UI ---
 
-      const info = getIssueInfo()
-      const currentUrl = window.location.href
-      const options = [{ value: currentUrl }]
-      if (info) {
-        options.push(
-          { value: info.numericPart },
-          { value: info.number },
-          { value: info.title },
-          { value: `"${info.title}" (${info.number})` }
-        )
-        if (info.branchName) {
-          options.push({ value: info.branchName })
-        }
+    let modalOverlay = null
+    let modalKeyHandler = null
+
+    const kbdStyle = `
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 22px;
+      height: 22px;
+      padding: 0 6px;
+      border: 1px solid var(--borderColor-default, #d0d7de);
+      border-radius: 5px;
+      background: var(--bgColor-muted, #f6f8fa);
+      color: var(--fgColor-muted, #656d76);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", monospace;
+      font-size: 11px;
+      font-weight: 500;
+      line-height: 1;
+      box-shadow: inset 0 -1px 0 var(--borderColor-default, #d0d7de);
+    `
+
+    const closeModal = () => {
+      if (modalOverlay) {
+        modalOverlay.remove()
+        modalOverlay = null
       }
-
-      options.forEach((opt) => {
-        const item = document.createElement('button')
-        item.className = 'custom-copy-dropdown-item'
-        item.style.cssText = `
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        width: 100%;
-        padding: 8px 12px;
-        border: none;
-        background: none;
-        text-align: left;
-        cursor: pointer;
-        font-size: 14px;
-        color: var(--fgColor-default, #1f2328);
-        white-space: nowrap;
-      `
-        const displayText = truncateMiddle(opt.value, 50)
-        const needsTooltip = opt.value.length > 50
-        item.innerHTML = `<span class="item-label">${displayText}</span><span class="item-check" style="margin-left: auto; display: none;">${checkIcon}</span>`
-        if (needsTooltip) item.title = opt.value
-
-        item.addEventListener('mouseenter', () => {
-          item.style.backgroundColor = 'var(--bgColor-neutral-muted, #f6f8fa)'
-        })
-        item.addEventListener('mouseleave', () => {
-          item.style.backgroundColor = 'transparent'
-        })
-        item.addEventListener('click', async (e) => {
-          e.preventDefault()
-          e.stopPropagation()
-          await navigator.clipboard.writeText(opt.value)
-          const check = item.querySelector('.item-check')
-          check.style.display = 'block'
-          setTimeout(() => {
-            check.style.display = 'none'
-            dropdown.style.display = 'none'
-          }, 1000)
-        })
-        dropdown.appendChild(item)
-      })
+      if (modalKeyHandler) {
+        document.removeEventListener('keydown', modalKeyHandler, true)
+        modalKeyHandler = null
+      }
     }
 
+    const doCopy = async (value, row) => {
+      await navigator.clipboard.writeText(value)
+      const check = row.querySelector('.row-check')
+      const label = row.querySelector('.row-label')
+      if (check && label) {
+        label.style.display = 'none'
+        check.style.display = 'inline-flex'
+      }
+      setTimeout(closeModal, 400)
+    }
+
+    const openModal = () => {
+      closeModal()
+
+      const info = getIssueInfo()
+      if (!info) return
+
+      const options = []
+
+      // 1: quoted title + number
+      options.push({
+        keys: ['1'],
+        value: `"${info.title}" (${info.number})`,
+      })
+
+      // 2: branch name (PR only)
+      if (info.branchName) {
+        options.push({
+          keys: ['b', '2'],
+          value: info.branchName,
+        })
+      }
+
+      // 3: number (plain), # copies with #
+      options.push({
+        keys: ['#', 'n', info.branchName ? '3' : '2'],
+        value: info.numericPart,
+        altCopies: { '#': info.number },
+      })
+
+      // 4: title
+      options.push({
+        keys: ['t', info.branchName ? '4' : '3'],
+        value: info.title,
+      })
+
+      // u: URL (hidden, keyboard-only)
+      const currentUrl = window.location.href
+      const hiddenOptions = [{ keys: ['u'], value: currentUrl }]
+
+      // Build modal
+      modalOverlay = document.createElement('div')
+      modalOverlay.style.cssText = `
+        position: fixed;
+        inset: 0;
+        z-index: 9999;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: rgba(0, 0, 0, 0.4);
+      `
+
+      const card = document.createElement('div')
+      card.style.cssText = `
+        background: var(--bgColor-default, #ffffff);
+        border: 1px solid var(--borderColor-default, #d0d7de);
+        border-radius: 12px;
+        box-shadow: 0 16px 48px rgba(0, 0, 0, 0.2);
+        padding: 12px 0;
+        min-width: 400px;
+        max-width: 700px;
+      `
+
+      const keyMap = {}
+
+      options.forEach((opt) => {
+        const row = document.createElement('button')
+        row.style.cssText = `
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          width: 100%;
+          padding: 8px 16px;
+          border: none;
+          background: none;
+          text-align: left;
+          cursor: pointer;
+          font-size: 14px;
+          color: var(--fgColor-default, #1f2328);
+          white-space: nowrap;
+        `
+
+        row.addEventListener('mouseenter', () => {
+          row.style.backgroundColor = 'var(--bgColor-neutral-muted, #f6f8fa)'
+        })
+        row.addEventListener('mouseleave', () => {
+          row.style.backgroundColor = 'transparent'
+        })
+
+        const keysHtml = opt.keys
+          .map((k) => `<span style="${kbdStyle}">${k}</span>`)
+          .join('')
+
+        const keysContainer = `<span style="display: inline-flex; gap: 3px; min-width: 90px; justify-content: flex-end;">${keysHtml}</span>`
+
+        const displayText = truncateMiddle(opt.value, 60)
+        const needsTooltip = opt.value.length > 60
+
+        row.innerHTML = `${keysContainer}<span class="row-label" style="margin-left: 8px;">${displayText}</span><span class="row-check" style="margin-left: 8px; display: none;">${checkIcon}</span>`
+        if (needsTooltip) row.title = opt.value
+
+        row.addEventListener('click', (e) => {
+          e.preventDefault()
+          e.stopPropagation()
+          doCopy(opt.value, row)
+        })
+
+        opt.keys.forEach((k) => {
+          keyMap[k] = { value: opt.altCopies?.[k] || opt.value, row }
+        })
+
+        card.appendChild(row)
+      })
+
+      hiddenOptions.forEach((opt) => {
+        opt.keys.forEach((k) => {
+          keyMap[k] = { value: opt.value, row: null }
+        })
+      })
+
+      modalOverlay.appendChild(card)
+      document.body.appendChild(modalOverlay)
+
+      modalOverlay.addEventListener('click', (e) => {
+        if (e.target === modalOverlay) closeModal()
+      })
+
+      modalKeyHandler = (e) => {
+        if (e.key === 'Escape') {
+          e.preventDefault()
+          e.stopPropagation()
+          e.stopImmediatePropagation()
+          closeModal()
+          return
+        }
+
+        const tag = e.target.tagName
+        if (
+          tag === 'INPUT' ||
+          tag === 'TEXTAREA' ||
+          tag === 'SELECT' ||
+          e.target.isContentEditable
+        )
+          return
+
+        const entry = keyMap[e.key]
+        if (entry) {
+          e.preventDefault()
+          e.stopPropagation()
+          e.stopImmediatePropagation()
+          if (entry.row) {
+            doCopy(entry.value, entry.row)
+          } else {
+            navigator.clipboard.writeText(entry.value)
+            closeModal()
+          }
+        }
+      }
+      document.addEventListener('keydown', modalKeyHandler, true)
+    }
+
+    // --- Inject copy button ---
+
     const injectCopyButton = () => {
-      // Reset injection state when URL changes (SPA navigation, side panel open/close)
       const currentUrl = window.location.href
       if (currentUrl !== lastUrl) {
         lastUrl = currentUrl
@@ -255,7 +396,6 @@
         }
       }
 
-      // Find the number span next to the title
       let numberEl = null
       let anchorEl = null
 
@@ -269,9 +409,6 @@
           )
           if (titleSuffix) numberEl = findNumberElement(titleSuffix)
         }
-        // On project-view side panels the number <a> lives inside a container
-        // div; inject the button after that container so it doesn't sit between
-        // the number link and its wrapper's layout.
         anchorEl =
           numberEl?.closest(
             '[class*="HeaderViewer-module__issueNumberContainer"]'
@@ -305,7 +442,6 @@
         pollingTimer = null
       }
 
-      // Create the copy button
       const wrapper = document.createElement('span')
       wrapper.className = 'custom-copy-btn-wrapper'
       wrapper.style.cssText =
@@ -315,16 +451,16 @@
       btn.className = 'btn-octicon'
       btn.setAttribute('aria-label', 'Copy')
       btn.style.cssText = `
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      padding: 4px;
-      border: none;
-      background: none;
-      cursor: pointer;
-      color: var(--fgColor-muted, #656d76);
-      border-radius: 6px;
-    `
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 4px;
+        border: none;
+        background: none;
+        cursor: pointer;
+        color: var(--fgColor-muted, #656d76);
+        border-radius: 6px;
+      `
       btn.innerHTML = copyIcon
 
       btn.addEventListener('mouseenter', () => {
@@ -334,52 +470,34 @@
         btn.style.backgroundColor = 'transparent'
       })
 
-      const dropdown = document.createElement('div')
-      dropdown.style.cssText = `
-      position: absolute;
-      top: 100%;
-      left: 0;
-      margin-top: 4px;
-      background: var(--bgColor-default, #ffffff);
-      border: 1px solid var(--borderColor-default, #d0d7de);
-      border-radius: 6px;
-      box-shadow: 0 8px 24px rgba(140, 149, 159, 0.2);
-      z-index: 100;
-      min-width: 350px;
-      padding: 4px 0;
-      display: none;
-    `
-
       btn.addEventListener('click', (e) => {
         e.preventDefault()
         e.stopPropagation()
-        buildDropdownItems(dropdown)
-        const isVisible = dropdown.style.display === 'block'
-        dropdown.style.display = isVisible ? 'none' : 'block'
-        if (!isVisible) {
-          // Pick the side with more room
-          dropdown.style.left = '0'
-          dropdown.style.right = 'auto'
-          const rect = dropdown.getBoundingClientRect()
-          if (rect.right > window.innerWidth) {
-            dropdown.style.left = 'auto'
-            dropdown.style.right = '0'
-          }
-        }
-      })
-
-      document.addEventListener('click', (e) => {
-        if (!wrapper.contains(e.target)) {
-          dropdown.style.display = 'none'
-        }
+        openModal()
       })
 
       wrapper.appendChild(btn)
-      wrapper.appendChild(dropdown)
       anchorEl.after(wrapper)
 
       console.log('GitHub Copy Button Script: Injected copy button')
     }
+
+    // 'c' shortcut to open copy modal (only when not typing in an input)
+    document.addEventListener('keydown', (e) => {
+      if (modalOverlay) return
+      if (e.key !== 'c' || e.metaKey || e.ctrlKey || e.altKey) return
+      const tag = e.target.tagName
+      if (
+        tag === 'INPUT' ||
+        tag === 'TEXTAREA' ||
+        tag === 'SELECT' ||
+        e.target.isContentEditable
+      )
+        return
+      e.preventDefault()
+      e.stopPropagation()
+      openModal()
+    })
 
     const observer = new MutationObserver(injectCopyButton)
     observer.observe(document.body, { childList: true, subtree: true })
