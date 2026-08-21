@@ -74,6 +74,19 @@
       return null
     }
 
+    const getBranchName = () => {
+      if (!window.location.pathname.includes('/pull/')) return null
+      const branchEls = document.querySelectorAll(
+        '[data-component="BranchName"]'
+      )
+      if (branchEls.length >= 2) {
+        const text = branchEls[1].textContent.trim()
+        const colonIdx = text.indexOf(':')
+        return colonIdx >= 0 ? text.substring(colonIdx + 1) : text
+      }
+      return null
+    }
+
     const getIssueInfo = () => {
       let title, number
 
@@ -81,11 +94,22 @@
       const pageTitle = document.querySelector('h1[data-component="PH_Title"]')
       if (pageTitle) {
         const titleSpan = pageTitle.querySelector('.markdown-title')
-        const numberEl = findNumberElement(pageTitle)
+        let numberEl = findNumberElement(pageTitle)
+        if (!numberEl) {
+          const titleSuffix = pageTitle.parentElement?.querySelector(
+            '[class*="titleSuffix"]'
+          )
+          if (titleSuffix) numberEl = findNumberElement(titleSuffix)
+        }
         if (titleSpan && numberEl) {
           title = titleSpan.textContent.trim()
           number = numberEl.textContent.trim()
-          return { title, number, numericPart: number.replace(/\D/g, '') }
+          return {
+            title,
+            number,
+            numericPart: number.replace(/\D/g, ''),
+            branchName: getBranchName(),
+          }
         }
       }
 
@@ -97,7 +121,12 @@
       if (modernTitle && modernNumber) {
         title = modernTitle.textContent.trim()
         number = modernNumber.textContent.trim()
-        return { title, number, numericPart: number.replace(/\D/g, '') }
+        return {
+          title,
+          number,
+          numericPart: number.replace(/\D/g, ''),
+          branchName: getBranchName(),
+        }
       }
 
       // Try classic view
@@ -108,7 +137,12 @@
       if (classicTitle && classicNumber) {
         title = classicTitle.textContent.trim()
         number = classicNumber.textContent.trim()
-        return { title, number, numericPart: number.replace(/\D/g, '') }
+        return {
+          title,
+          number,
+          numericPart: number.replace(/\D/g, ''),
+          branchName: getBranchName(),
+        }
       }
 
       // Fallback: parse from URL and document title
@@ -121,7 +155,12 @@
         if (titleMatch) {
           title = titleMatch[1].trim()
           number = `#${num}`
-          return { title, number, numericPart: num }
+          return {
+            title,
+            number,
+            numericPart: num,
+            branchName: getBranchName(),
+          }
         }
       }
 
@@ -147,6 +186,9 @@
           { value: info.title },
           { value: `"${info.title}" (${info.number})` }
         )
+        if (info.branchName) {
+          options.push({ value: info.branchName })
+        }
       }
 
       options.forEach((opt) => {
@@ -221,6 +263,12 @@
       const pageTitle = document.querySelector('h1[data-component="PH_Title"]')
       if (pageTitle) {
         numberEl = findNumberElement(pageTitle)
+        if (!numberEl) {
+          const titleSuffix = pageTitle.parentElement?.querySelector(
+            '[class*="titleSuffix"]'
+          )
+          if (titleSuffix) numberEl = findNumberElement(titleSuffix)
+        }
         // On project-view side panels the number <a> lives inside a container
         // div; inject the button after that container so it doesn't sit between
         // the number link and its wrapper's layout.
