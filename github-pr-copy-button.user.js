@@ -222,9 +222,9 @@
 
       const options = []
 
-      // 1: quoted title + number
+      // 1: quoted title + number (c,c quick-copies this)
       options.push({
-        keys: ['1'],
+        keys: ['c', '1'],
         value: `"${info.title}" (${info.number})`,
       })
 
