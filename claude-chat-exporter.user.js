@@ -2,20 +2,16 @@
 // @name         Claude Chat Exporter
 // @namespace    http://tampermonkey.net/
 // @version      1.0
-// @description  Export Claude conversations to markdown. Click the Export button next to Share.
+// @description  Export Claude conversations to markdown. Adds Copy MD and Export buttons next to Share.
 // @author       Anthony Panozzo, Claude (Opus 4.5)
-// @match        https://claude.ai/new
-// @match        https://claude.ai/chat/*
-// @match        https://claude.ai/share/*
+// @match        https://claude.ai/*
 // @grant        none
 // ==/UserScript==
 
 ;(function () {
   'use strict'
 
-  function delay(ms) {
-    return new Promise((resolve) => setTimeout(resolve, ms))
-  }
+  const LOG_PREFIX = 'Claude Chat Exporter:'
 
   function downloadMarkdown(content, filename) {
     const blob = new Blob([content], { type: 'text/markdown' })
@@ -28,20 +24,6 @@
     URL.revokeObjectURL(a.href)
   }
 
-  function getConversationTitle() {
-    // Title is in the chat title button's truncate div
-    const titleEl = document.querySelector(
-      'button[data-testid="chat-title-button"] .truncate'
-    )
-    if (titleEl?.textContent?.trim()) {
-      const title = titleEl.textContent.trim()
-      if (title !== 'Claude' && !title.includes('New conversation')) {
-        return title
-      }
-    }
-    return 'Claude Conversation'
-  }
-
   function sanitizeFilename(title) {
     return title
       .replace(/[<>:"/\\|?*]/g, '_')
@@ -52,285 +34,255 @@
       .substring(0, 100)
   }
 
-  function htmlToMarkdown(element) {
-    // Convert HTML content to markdown
+  async function fetchJson(url) {
+    const response = await fetch(url, { credentials: 'include' })
+    if (!response.ok) {
+      throw new Error(`${response.status} fetching ${url}`)
+    }
+    return response.json()
+  }
+
+  async function getOrgId() {
+    const fromCookie = document.cookie.match(/lastActiveOrg=([^;]+)/)?.[1]
+    if (fromCookie) return fromCookie
+
+    const orgs = await fetchJson('/api/organizations')
+    const chatOrg = orgs.find((o) => o.capabilities?.includes('chat'))
+    if (!chatOrg) throw new Error('Could not determine organization')
+    return chatOrg.uuid
+  }
+
+  // Fetch the conversation from claude.ai's own API rather than scraping the
+  // DOM: the transcript is virtualized (offscreen messages aren't rendered) and
+  // the API returns the original markdown.
+  async function fetchConversation() {
+    const [, kind, id] = location.pathname.split('/')
+    const params = 'rendering_mode=messages&render_all_tools=true'
+
+    let url
+    if (kind === 'chat' && id) {
+      const orgId = await getOrgId()
+      url = `/api/organizations/${orgId}/chat_conversations/${id}?tree=True&${params}`
+    } else if (kind === 'share' && id) {
+      url = `/api/chat_snapshots/${id}?${params}`
+    } else {
+      throw new Error('Not on a conversation page')
+    }
+
+    console.log(LOG_PREFIX, 'fetching', url)
+    return fetchJson(url)
+  }
+
+  // With tree=True the API returns every branch (edits/retries). Walk from the
+  // current leaf back to the root to get the branch being viewed.
+  function currentBranch(conversation) {
+    const messages = conversation.chat_messages || []
+    const leafId = conversation.current_leaf_message_uuid
+    const byId = new Map(messages.map((m) => [m.uuid, m]))
+    if (!leafId || !byId.has(leafId)) return messages
+
+    const branch = []
+    for (let m = byId.get(leafId); m; m = byId.get(m.parent_message_uuid)) {
+      branch.unshift(m)
+    }
+    return branch
+  }
+
+  function messageText(message) {
+    const blocks = message.content || []
+    const text = blocks
+      .filter((block) => block.type === 'text' && block.text)
+      .map((block) => block.text.trim())
+      .join('\n\n')
+    return text || (message.text || '').trim()
+  }
+
+  // Uploaded files (images, PDFs) only have names; text attachments and
+  // pasted text include their content in extracted_content
+  function attachmentsMarkdown(message) {
+    const files = [...(message.files || []), ...(message.files_v2 || [])]
+    const fileNames = [...new Set(files.map((f) => f.file_name))].filter(
+      Boolean
+    )
+
     let markdown = ''
-
-    const processNode = (node) => {
-      if (node.nodeType === Node.TEXT_NODE) {
-        return node.textContent
-      }
-
-      if (node.nodeType !== Node.ELEMENT_NODE) {
-        return ''
-      }
-
-      const tag = node.tagName.toLowerCase()
-      const children = Array.from(node.childNodes).map(processNode).join('')
-
-      switch (tag) {
-        case 'p':
-          return children + '\n\n'
-        case 'br':
-          return '\n'
-        case 'strong':
-        case 'b':
-          return `**${children}**`
-        case 'em':
-        case 'i':
-          return `*${children}*`
-        case 'code':
-          if (node.parentElement?.tagName.toLowerCase() === 'pre') {
-            return children
-          }
-          return `\`${children}\``
-        case 'pre':
-          const codeBlock = node.querySelector('code')
-          const lang = codeBlock?.className?.match(/language-(\w+)/)?.[1] || ''
-          const code = codeBlock?.textContent || node.textContent
-          return `\n\`\`\`${lang}\n${code}\n\`\`\`\n\n`
-        case 'h1':
-          return `## ${children}\n\n`
-        case 'h2':
-          return `### ${children}\n\n`
-        case 'h3':
-          return `#### ${children}\n\n`
-        case 'h4':
-          return `##### ${children}\n\n`
-        case 'h5':
-          return `###### ${children}\n\n`
-        case 'h6':
-          return `###### ${children}\n\n`
-        case 'ul':
-          return (
-            '\n' +
-            Array.from(node.children)
-              .map((li) => `- ${processNode(li).trim()}`)
-              .join('\n') +
-            '\n\n'
-          )
-        case 'ol':
-          return (
-            '\n' +
-            Array.from(node.children)
-              .map((li, i) => `${i + 1}. ${processNode(li).trim()}`)
-              .join('\n') +
-            '\n\n'
-          )
-        case 'li':
-          return children
-        case 'a':
-          const href = node.getAttribute('href')
-          return href ? `[${children}](${href})` : children
-        case 'blockquote':
-          return (
-            children
-              .trim()
-              .split('\n')
-              .map((line) => `> ${line}`)
-              .join('\n') + '\n\n'
-          )
-        case 'hr':
-          return '\n---\n\n'
-        case 'div':
-        case 'span':
-          return children
-        default:
-          return children
-      }
+    if (fileNames.length > 0) {
+      markdown += `_Attachments: ${fileNames.join(', ')}_\n\n`
     }
-
-    markdown = processNode(element)
-
-    // Clean up extra newlines
-    return markdown.replace(/\n{3,}/g, '\n\n').trim()
-  }
-
-  function extractConversation() {
-    const messages = []
-
-    // Find message turn containers using data-test-render-count
-    // Each turn (human or Claude) is wrapped in a div with this attribute
-    const turnContainers = document.querySelectorAll('[data-test-render-count]')
-
-    turnContainers.forEach((turn) => {
-      // Check if this is a human message
-      const userMessage = turn.querySelector('[data-testid="user-message"]')
-      if (userMessage) {
-        const userText = userMessage.innerText?.trim() || ''
-        if (userText) {
-          messages.push({ type: 'human', content: userText })
-        }
-        return
+    for (const attachment of message.attachments || []) {
+      const name = attachment.file_name || 'Pasted text'
+      const content = attachment.extracted_content || ''
+      if (!content) {
+        markdown += `_Attachment: ${name}_\n\n`
+        continue
       }
-
-      // Check if this is a Claude response
-      const claudeResponse = turn.querySelector('.font-claude-response')
-      if (claudeResponse) {
-        // Find ALL standard-markdown sections within this turn
-        // They can be deeply nested, so don't restrict with :scope > div >
-        const standardMarkdowns = turn.querySelectorAll('.standard-markdown')
-
-        // Combine all sections into one response
-        // Use a Set to dedupe (sometimes there are duplicate elements)
-        const seenContent = new Set()
-        const combinedParts = []
-
-        standardMarkdowns.forEach((md) => {
-          const markdown = htmlToMarkdown(md)
-          // Skip empty or duplicate content
-          if (markdown && !seenContent.has(markdown)) {
-            seenContent.add(markdown)
-            combinedParts.push(markdown)
-          }
-        })
-
-        if (combinedParts.length > 0) {
-          messages.push({ type: 'claude', content: combinedParts.join('\n\n') })
-        }
-      }
-    })
-
-    return messages
-  }
-
-  function buildMarkdown(title, messages) {
-    let markdown = `# ${title}\n\n`
-
-    for (const msg of messages) {
-      if (msg.type === 'human') {
-        markdown += `## Human\n\n${msg.content}\n\n---\n\n`
-      } else {
-        markdown += `## Claude\n\n${msg.content}\n\n---\n\n`
-      }
+      // Fence must be longer than any backtick run inside the content
+      const longestRun = Math.max(
+        0,
+        ...(content.match(/`+/g) || []).map((run) => run.length)
+      )
+      const fence = '`'.repeat(Math.max(3, longestRun + 1))
+      markdown +=
+        `<details>\n<summary>${name}</summary>\n\n` +
+        `${fence}\n${content.trim()}\n${fence}\n\n</details>\n\n`
     }
-
     return markdown
   }
 
-  async function startExport(button) {
-    const originalText = button.textContent
-    button.textContent = 'Exporting...'
-    button.disabled = true
+  function buildMarkdown(conversation) {
+    const title = conversation.name || 'Claude Conversation'
+    let markdown = `# ${title}\n\n`
+    let count = 0
 
-    try {
-      await delay(100)
+    for (const message of currentBranch(conversation)) {
+      const heading = message.sender === 'human' ? 'Human' : 'Claude'
+      const text = messageText(message)
+      const attachments = attachmentsMarkdown(message)
+      if (!text && !attachments) continue
 
-      const title = getConversationTitle()
-      const messages = extractConversation()
+      markdown += `## ${heading}\n\n${attachments}`
+      if (text) markdown += `${text}\n\n`
+      markdown += '---\n\n'
+      count++
+    }
 
-      if (messages.length === 0) {
-        alert(
-          'No messages found to export. The page structure may have changed.'
-        )
-        return
-      }
+    if (count === 0) throw new Error('No messages found to export')
+    return { title, markdown, count }
+  }
 
-      const markdown = buildMarkdown(title, messages)
-      const filename = `${sanitizeFilename(title)}.md`
-      downloadMarkdown(markdown, filename)
-
-      button.textContent = 'Exported!'
-      setTimeout(() => {
-        button.textContent = originalText
-        button.disabled = false
-      }, 2000)
-
-      console.log(
-        `Claude Chat Exporter: Exported ${messages.length} messages to ${filename}`
-      )
-    } catch (error) {
-      console.error('Claude Chat Exporter: Export failed:', error)
-      alert(`Export failed: ${error.message}`)
-      button.textContent = originalText
+  function flashButton(button, text) {
+    const label = buttonLabel(button)
+    const originalText = button.dataset.label
+    label.textContent = text
+    setTimeout(() => {
+      label.textContent = originalText
       button.disabled = false
+    }, 2000)
+  }
+
+  async function runAction(button, action) {
+    button.disabled = true
+    try {
+      await action()
+    } catch (error) {
+      console.error(LOG_PREFIX, 'failed:', error)
+      alert(`Claude Chat Exporter failed: ${error.message}`)
+      flashButton(button, 'Failed')
     }
   }
 
-  let lastUrl = location.href
+  function startExport(button) {
+    return runAction(button, async () => {
+      const { title, markdown, count } = buildMarkdown(
+        await fetchConversation()
+      )
+      const filename = `${sanitizeFilename(title)}.md`
+      downloadMarkdown(markdown, filename)
+      console.log(LOG_PREFIX, `exported ${count} messages to ${filename}`)
+      flashButton(button, 'Exported!')
+    })
+  }
 
-  function addExportButton() {
-    // Find the Share button container
+  function startCopy(button) {
+    return runAction(button, async () => {
+      // Hand the clipboard a promise so the write is tied to the click's user
+      // activation even though the fetch happens afterwards.
+      let count = 0
+      const blobPromise = fetchConversation().then((conversation) => {
+        const result = buildMarkdown(conversation)
+        count = result.count
+        return new Blob([result.markdown], { type: 'text/plain' })
+      })
+      await navigator.clipboard.write([
+        new ClipboardItem({ 'text/plain': blobPromise }),
+      ])
+      console.log(LOG_PREFIX, `copied ${count} messages`)
+      flashButton(button, 'Copied!')
+    })
+  }
+
+  // Find the element whose text is the button's label, so it can be swapped
+  // without disturbing the icon/paint spans inside a cloned button.
+  function buttonLabel(button) {
+    const walker = document.createTreeWalker(button, NodeFilter.SHOW_TEXT)
+    for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+      const hidden = node.parentElement.closest('[aria-hidden="true"]')
+      if (node.textContent.trim() && !hidden) return node.parentElement
+    }
+    return button
+  }
+
+  // Icons are icon-font glyphs in aria-hidden spans; drop Share's icon
+  function removeIcons(button) {
+    button.querySelectorAll('[aria-hidden="true"]').forEach((el) => {
+      if (el.textContent.trim()) el.remove()
+    })
+  }
+
+  // Clone the native Share button (and its wrappers) so ours match its styling
+  function makeButton(shareWrapper, text, className, onClick) {
+    const wrapper = shareWrapper.cloneNode(true)
+    wrapper.classList.add(className)
+    const button =
+      wrapper.tagName === 'BUTTON' ? wrapper : wrapper.querySelector('button')
+    button.removeAttribute('data-testid')
+    button.removeAttribute('aria-haspopup')
+    button.removeAttribute('aria-expanded')
+    button.dataset.label = text
+    removeIcons(button)
+    buttonLabel(button).textContent = text
+    button.title = `${text} conversation as Markdown (Claude Chat Exporter userscript)`
+    button.addEventListener('click', (e) => {
+      e.preventDefault()
+      e.stopPropagation()
+      onClick(button)
+    })
+    return wrapper
+  }
+
+  function addButtons() {
     const shareButton = document.querySelector(
       'button[data-testid="wiggle-controls-actions-share"]'
     )
+    if (!shareButton) return
 
-    if (!shareButton) {
-      return
+    // Insert at the level of the actions group so we sit beside Share's wrapper
+    const group =
+      shareButton.closest('[data-testid="wiggle-controls-actions-group"]') ||
+      shareButton.parentElement
+    if (group.querySelector('.claude-export-button')) return
+
+    let shareWrapper = shareButton
+    while (shareWrapper.parentElement && shareWrapper.parentElement !== group) {
+      shareWrapper = shareWrapper.parentElement
     }
 
-    const container = shareButton.parentElement
-
-    // Check if button already exists in THIS container
-    if (container.querySelector('.claude-export-button')) {
-      return
-    }
-
-    // Create export button matching Share button style
-    const button = document.createElement('button')
-    button.className =
-      'claude-export-button inline-flex items-center justify-center relative shrink-0 can-focus select-none disabled:pointer-events-none disabled:opacity-50 disabled:shadow-none disabled:drop-shadow-none font-base-bold border-0.5 relative overflow-hidden transition duration-100 backface-hidden h-8 rounded-md px-3 min-w-[4rem] active:scale-[0.985] whitespace-nowrap !text-xs Button_secondary__Teecd'
-    button.type = 'button'
-    button.textContent = 'Export'
-    button.title =
-      'Export conversation to Markdown (added by Claude Chat Exporter userscript)'
-
-    button.addEventListener('click', () => startExport(button))
-
-    // Insert before Share button
-    container.insertBefore(button, shareButton)
+    const copy = makeButton(
+      shareWrapper,
+      'Copy MD',
+      'claude-copy-button',
+      startCopy
+    )
+    const exportButton = makeButton(
+      shareWrapper,
+      'Export',
+      'claude-export-button',
+      startExport
+    )
+    group.insertBefore(copy, shareWrapper)
+    group.insertBefore(exportButton, shareWrapper)
   }
 
-  function handleUrlChange() {
-    if (location.href !== lastUrl) {
-      lastUrl = location.href
-      // Remove any stale export buttons
-      document
-        .querySelectorAll('.claude-export-button')
-        .forEach((btn) => btn.remove())
-      // Re-add after a short delay to let the new page render
-      setTimeout(addExportButton, 100)
-      setTimeout(addExportButton, 500)
-      setTimeout(addExportButton, 1000)
-    }
-  }
-
-  // Keyboard shortcut
+  // Keyboard shortcut: Ctrl+Shift+E downloads
   document.addEventListener('keydown', (e) => {
     if (e.ctrlKey && e.shiftKey && e.key === 'E') {
       e.preventDefault()
-      const button = document.querySelector('.claude-export-button')
-      if (button) {
-        startExport(button)
-      } else {
-        // Fallback
-        const title = getConversationTitle()
-        const messages = extractConversation()
-        if (messages.length > 0) {
-          const markdown = buildMarkdown(title, messages)
-          const filename = `${sanitizeFilename(title)}.md`
-          downloadMarkdown(markdown, filename)
-        }
-      }
+      const button = document.querySelector('button[data-label="Export"]')
+      if (button) startExport(button)
     }
   })
 
-  // Initialize with mutation observer
-  const observer = new MutationObserver(() => {
-    handleUrlChange()
-    addExportButton()
-  })
+  const observer = new MutationObserver(addButtons)
   observer.observe(document.body, { childList: true, subtree: true })
-
-  // Also listen for popstate (back/forward navigation)
-  window.addEventListener('popstate', handleUrlChange)
-
-  // Try immediately and on delays
-  addExportButton()
-  setTimeout(addExportButton, 1000)
-  setTimeout(addExportButton, 3000)
-
-  console.log(
-    'Claude Chat Exporter loaded. Use the Export button or Ctrl+Shift+E.'
-  )
+  addButtons()
 })()
