@@ -22,13 +22,28 @@
   // note: using /* */ style comments in CSS is necessary!
   style.innerHTML = `
       /* don't strike out standard price (hard to read) */
-      s.kds-Price-original {
+      s.kds-Price-original,
+      .citrus-Price--original-price {
         text-decoration: none !important;
+        color: #555 !important;
       }
 
       /* display details of coupons on cart page */
       .SavingsZone--text {
         -webkit-line-clamp: unset !important;
+      }
+
+      /* show full coupon text on product cards (search results) */
+      .SavingsZone--coupon-text,
+      .SavingsZone--mini-text {
+        -webkit-line-clamp: unset !important;
+      }
+
+      /* show full coupon title in "Available Offers" drawer */
+      .SavingsDrawer--CouponCard-Info .truncate {
+        white-space: normal !important;
+        overflow: visible !important;
+        text-overflow: clip !important;
       }
     `
 
