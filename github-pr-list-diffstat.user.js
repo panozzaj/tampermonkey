@@ -69,6 +69,22 @@
       font-weight: 400;
       text-align: left;
     }
+    /* Narrow rows: stack the four categories in one column, then hide the
+       badge when even that would squeeze the title. Queries the row's width
+       rather than the viewport's, so side panels count too. */
+    .pr-diffstat-row { container-type: inline-size; }
+    @container (max-width: 820px) {
+      .pr-diffstat-slot { min-width: 200px; }
+      .pr-diffstat {
+        grid-template-columns: 5ch 7ch 7ch;
+        width: auto;
+      }
+      .pr-diffstat-label:nth-child(6n + 4) { padding-left: 0; }
+    }
+    @container (max-width: 520px) {
+      .pr-diffstat-slot { min-width: 0; }
+      .pr-diffstat { display: none; }
+    }
     .pr-own-login {
       font-weight: 600;
       background: var(--bgColor-attention-muted, #fff8c5);
@@ -293,6 +309,7 @@
 
     const prUrl = titleLink.href.replace(/[?#].*$/, '')
     const badge = document.createElement('div')
+    row.classList.add('pr-diffstat-row')
     column.classList.add('pr-diffstat-slot')
     column.prepend(badge)
 
